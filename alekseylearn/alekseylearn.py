@@ -86,10 +86,7 @@ class TrainJob:
             session = boto3.session.Session()
             sts_client = boto3.client('sts')
             ecr_client = boto3.client('ecr')
-
-            account_id = sts_client.get_caller_identity()['Account']
-            region = session.region_name
-            repository=f'{account_id}.dkr.ecr.{region}.amazonaws.com/{self.tag}'
+            _, account_id, repository = get_repository_info(session, sts_client, self.tag)
 
             # TODO: try to catch the botocore.errorfactory.RepositoryNotFound error
             try:
@@ -130,7 +127,7 @@ class TrainJob:
             role_name = self.config.pop('role_name', default_role_name)
             # TODO: try to catch the botocore.errorfactory.RepositoryNotFound error
             try:
-                role = iam_client.get_role(RoleName=role_name)
+                role_info = iam_client.get_role(RoleName=role_name)
             except:
                 if role_name != default_role_name:
                     raise ValueError(
@@ -142,28 +139,28 @@ class TrainJob:
                     raise NotImplementedError
                     # role = iam_client.create_role(RoleName='alekseylearn-test')
 
-            # FIXME: figure out the AWS session authorization song and dance
             sts_client = self.sts_client if hasattr(self, 'sts_client') else boto3.client('sts')
-            assumed_role = sts_client.assume_role(
-                RoleArn=role['Role']['Arn'],
+            assumed_role_auth = sts_client.assume_role(
+                RoleArn=role_info['Role']['Arn'],
                 RoleSessionName='alekseylearn_test_session'
             )
-            session = sage.Session()
-            exec_role = sage.get_execution_role()
+            assumed_role_session = boto3.session.Session(
+                aws_access_key_id = assumed_role_auth['Credentials']['AccessKeyId'],
+                aws_secret_access_key = assumed_role_auth['Credentials']['SecretAccessKey'], 
+                aws_session_token = assumed_role_auth['Credentials']['SessionToken']
+            )
+            session = sage.Session(boto_session=assumed_role_session)
+            execution_role = sage.get_execution_role(sagemaker_session=session)
 
-            # if `push` was previous called the repository will already have been set
-            # otherwise we must build the repository again here
-            # TODO: use a lazy-loaded attribute
             if not hasattr(self, 'repository'):
-                account_id = session.boto_session.client('sts').get_caller_identity()['Account']
-                region = session.boto_session.region_name
-                # TODO: extract this to a helper method as it is used in push also
-                self.repository = f'{account_id}.dkr.ecr.{region}.amazonaws.com/{self.tag}'
+                _, _, self.repository = get_repository_info(session, sts_client, self.tag)
 
             clf = sage.estimator.Estimator(
-                self.repository, exec_role, 1, 'ml.c4.2xlarge', 
-                output_path="s3://alpha-quilt-storage/aleksey/alekseylearn-test",
-                sagemaker_session=self.session
+                self.repository, execution_role, 
+                self.config.pop('train_instance_count', 1), 
+                self.config.pop('train_instance_type', 'ml.c4.2xlarge'),
+                output_path='s3://alpha-quilt-storage/aleksey/alekseylearn-test',
+                sagemaker_session=session
             )
             clf.fit()
         else:
@@ -203,6 +200,18 @@ class TrainJob:
         self.extract(path)
 
 
+def create_template(template_name, dirpath, filename, **kwargs):
+    """
+    Helper function for writing a parameterized template to disk.
+    """
+    template_env = jinja2.Environment(loader=jinja2.PackageLoader('alekseylearn', 'templates'))
+    template_text = template_env.get_template(template_name).render(
+        **kwargs
+    )
+    with open(dirpath / filename, 'w') as f:
+        f.write(template_text)
+
+
 def create_dockerfile(driver, dirpath, filepath):
     """
     Creates a Dockerfile compatible with the given `driver` and writes to to disk.
@@ -217,13 +226,7 @@ def create_dockerfile(driver, dirpath, filepath):
         Name of the model training artifact being bundled.
     """
     if driver == 'sagemaker':
-        # TODO: make this a common component of create_dockerfile and create_runfile via helper.
-        template_env = jinja2.Environment(loader=jinja2.PackageLoader('alekseylearn', 'templates'))
-        template_text = template_env.get_template('sagemaker/Dockerfile').render(
-            filepath=filepath.name
-        )
-        with open(dirpath / 'Dockerfile', 'w') as f:
-            f.write(template_text)
+        create_template('sagemaker/Dockerfile', dirpath, 'Dockerfile', filepath=filepath.name)
     else:
         raise NotImplementedError
 
@@ -238,18 +241,20 @@ def create_runfile(driver, dirpath, filepath):
             run_cmd =\
                 "jupyter nbconvert --execute --ExecutePreprocessor.timeout=-1 "\
                 "--to notebook --inplace build.ipynb"
-            template_env = jinja2.Environment(
-                loader=jinja2.PackageLoader('alekseylearn', 'templates')
-            )
-            template_text = template_env.get_template('sagemaker/run.sh').render(
-                run_cmd=run_cmd
-            )
-            with open(dirpath / 'run.sh', 'w') as f:
-                f.write(template_text)
+            create_template('sagemaker/run.sh', dirpath, 'run.sh', run_cmd = run_cmd)
         else:
             raise NotImplementedError
     else:
         raise NotImplementedError
+
+
+def get_repository_info(session, tag, sts_client=None):
+    sts_client = sts_client if sts_client else session.client('sts')
+    account_id = sts_client.get_caller_identity()['Account']
+    region = session.region_name
+
+    repository = f'{account_id}.dkr.ecr.{region}.amazonaws.com/{tag}'
+    return region, account_id, repository
 
 
 def validate_path(path):
