@@ -31,8 +31,8 @@ class TrainJob:
             The precise list of configuration options differs from driver to driver. See the
             documentation for more information.
         """
-        filepath = pathlib.Path(filepath)
-        dirpath = pathlib.Path(filepath).parent
+        filepath = pathlib.Path(filepath).absolute()
+        dirpath = filepath.parent
         if not filepath.exists():
             raise ValueError('The training artifact points to a non-existent file.')
         if filepath.suffix != '.ipynb':
@@ -153,7 +153,7 @@ class TrainJob:
             sts_client = self.sts_client if hasattr(self, 'sts_client') else boto3.client('sts')
             assumed_role_auth = sts_client.assume_role(
                 RoleArn=role_info['Role']['Arn'],
-                RoleSessionName='alekseylearn_sagemaker_session'
+                RoleSessionName='alekseylearn_test_session'
             )
             assumed_role_session = boto3.session.Session(
                 aws_access_key_id = assumed_role_auth['Credentials']['AccessKeyId'],
