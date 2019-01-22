@@ -2,6 +2,7 @@ from io import StringIO
 import base64
 import pathlib
 import tarfile
+import re
 
 import docker
 import jinja2
@@ -43,6 +44,9 @@ class TrainJob:
         if driver == 'sagemaker':
             if config is None or 'output_path' not in config:
                 raise ValueError('The SageMaker driver requires an output_path to "s3://".')
+            # The default SageMaker role enforces this rule, so we should do so too.
+            if 'sagemaker' not in config['output_path']:
+                raise ValueError('"output_path" must contain the word "sagemaker".')
 
         # TODO: allow conda code requirement definitions as well
         reqfile = dirpath / 'requirements.txt'
@@ -92,7 +96,7 @@ class TrainJob:
             session = boto3.session.Session()
             sts_client = boto3.client('sts')
             ecr_client = boto3.client('ecr')
-            _, account_id, repository = get_repository_info(session, sts_client, self.tag)
+            _, account_id, repository = get_repository_info(session, self.tag, sts_client)
 
             # TODO: try to catch the botocore.errorfactory.RepositoryNotFound error
             try:
@@ -130,7 +134,7 @@ class TrainJob:
             iam_client = boto3.client('iam')
 
             # FIXME: temporarily using this role name for testing using the Quilt org
-            default_role_name = 'aleksey_sagemaker_role'
+            default_role_name = 'alekseylearn_sagemaker_role'
             role_name = self.config.pop('role_name', default_role_name)
             # TODO: try to catch the botocore.errorfactory.RepositoryNotFound error
             try:
@@ -149,7 +153,7 @@ class TrainJob:
             sts_client = self.sts_client if hasattr(self, 'sts_client') else boto3.client('sts')
             assumed_role_auth = sts_client.assume_role(
                 RoleArn=role_info['Role']['Arn'],
-                RoleSessionName='alekseylearn_test_session'
+                RoleSessionName='alekseylearn_sagemaker_session'
             )
             assumed_role_session = boto3.session.Session(
                 aws_access_key_id = assumed_role_auth['Credentials']['AccessKeyId'],
@@ -160,7 +164,7 @@ class TrainJob:
             execution_role = sage.get_execution_role(sagemaker_session=session)
 
             if not hasattr(self, 'repository'):
-                _, _, self.repository = get_repository_info(session, sts_client, self.tag)
+                _, _, self.repository = get_repository_info(session, self.tag, sts_client)
 
             clf = sage.estimator.Estimator(
                 self.repository, execution_role, 
@@ -201,6 +205,7 @@ class TrainJob:
 
             if extract:
                 tarfile.open(local_model_filepath).extractall()
+                pathlib.Path(local_model_filepath).unlink()
 
         else:
             raise NotImplementedError
@@ -286,7 +291,8 @@ def get_job_name(tag):
     sagemaker_client = boto3.client('sagemaker')
     finished_jobs = sagemaker_client.list_training_jobs()['TrainingJobSummaries']
     # TODO: ensure that the job name is always a valid ARN name
-    prefix = f'alekseylearn-{tag.replace("/", "_")}-'
+    # re.compile('^[a-zA-Z0-9](-*[a-zA-Z0-9])*').matchall(prefix) is not None
+    prefix = f'alekseylearn-{tag.replace("/", "-")}'
     previous_jobs = [j for j in finished_jobs if j['TrainingJobName'].startswith(prefix)]
     n = len(previous_jobs)
     job_name = f'{prefix}-{n}'
