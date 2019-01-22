@@ -12,9 +12,10 @@ def cli():
 @click.argument('training_artifact_path')
 @click.argument('model_artifact_path')
 @click.option('--driver', default='sagemaker', help='Driver to be used for running the train job.')
+@click.option('--envfile', default=None, help='Code environment definition file to build with.')
 @click.option('--overwrite', default=False, help='If true, overwrite existing training artifacts.')
 @click.pass_context
-def run(ctx, training_artifact_path, model_artifact_path, driver, overwrite):
+def run(ctx, training_artifact_path, model_artifact_path, driver, envfile, overwrite):
     def fmt_ctx_arg(arg):
         if arg[:9] != '--config.':
             raise ValueError("Configuration arguments must be prefixed with `config`")

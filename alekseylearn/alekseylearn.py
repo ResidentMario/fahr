@@ -8,7 +8,7 @@ import docker
 import jinja2
 
 class TrainJob:
-    def __init__(self, filepath, driver='sagemaker', overwrite=False, config=None):
+    def __init__(self, filepath, driver='sagemaker', envfile=None, overwrite=False, config=None):
         """
         Trains a machine learning model on the cloud.
 
@@ -23,6 +23,11 @@ class TrainJob:
             * 'sagemaker' -- Launches a model training job on Amazon using AWS SageMaker.
 
             Future options include 'kaggle' and 'ml-engine'.
+        envfile: str
+            Optional path to the file that defines the environment that will be built in the image.
+            Must be either a "requirements.txt" file (which will be parsed with `pip`) or an
+            "environment.yml" file (which will be parsed with `conda`). If left unspecified
+            whichever of these files is present in the build directory will be parsed.
         overwrite: bool
             If set to False `TrainJob` will respect any Dockerfile and run.sh files already present
             in the build directory. If set to True it will overwrite them.
@@ -48,14 +53,34 @@ class TrainJob:
             if 'sagemaker' not in config['output_path']:
                 raise ValueError('"output_path" must contain the word "sagemaker".')
 
-        # TODO: allow conda code requirement definitions as well
-        reqfile = dirpath / 'requirements.txt'
-        if not reqfile.exists():
-            raise ValueError('No requirements.txt file present in the build directory.')
+        if envfile:
+            envfile = pathlib.Path(envfile)
+            if envfile.name != 'requirements.txt' and envfile.name != 'environment.yml':
+                raise ValueError(
+                    '"envfile" must point to "requirements.txt" or "environment.yml" file'
+                )
+        else:
+            pip_reqfile = dirpath / 'requirements.txt'
+            conda_reqfile = dirpath / 'environment.yml'
+
+            pip_reqfile_exists = pip_reqfile.exists()
+            conda_reqfile_exists = conda_reqfile.exists()
+
+            if pip_reqfile_exists and conda_reqfile_exists:
+                raise ValueError(
+                    'Both requirements.txt and environment.yml are present. '
+                    'Please specify which to install from using the "envfile" parameter.'
+                )
+            if not pip_reqfile_exists and not conda_reqfile_exists:
+                raise ValueError(
+                    'No requirements.txt or environment.yml present and no "envfile" specified.'
+                )
+            else:
+                envfile = conda_reqfile if conda_reqfile_exists else pip_reqfile
 
         dockerfile = dirpath / 'Dockerfile'
         if not dockerfile.exists() or overwrite:
-            create_dockerfile('sagemaker', dirpath, filepath)
+            create_dockerfile('sagemaker', dirpath, filepath.name, envfile)
 
         runfile = dirpath / 'run.sh'
         if not runfile.exists() or overwrite:
@@ -133,7 +158,6 @@ class TrainJob:
 
             iam_client = boto3.client('iam')
 
-            # FIXME: temporarily using this role name for testing using the Quilt org
             default_role_name = 'alekseylearn_sagemaker_role'
             role_name = self.config.pop('role_name', default_role_name)
             # TODO: try to catch the botocore.errorfactory.RepositoryNotFound error
@@ -239,7 +263,7 @@ def create_template(template_name, dirpath, filename, **kwargs):
         f.write(template_text)
 
 
-def create_dockerfile(driver, dirpath, filepath):
+def create_dockerfile(driver, dirpath, filepath, envfile):
     """
     Creates a Dockerfile compatible with the given `driver` and writes to to disk.
 
@@ -253,7 +277,10 @@ def create_dockerfile(driver, dirpath, filepath):
         Name of the model training artifact being bundled.
     """
     if driver == 'sagemaker':
-        create_template('sagemaker/Dockerfile', dirpath, 'Dockerfile', filepath=filepath.name)
+        create_template(
+            'sagemaker/Dockerfile', dirpath, 'Dockerfile', filepath=filepath,
+            envfile=str(envfile)
+        )
     else:
         raise NotImplementedError
 

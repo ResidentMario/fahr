@@ -5,8 +5,13 @@ RUN ["mkdir", "app"]
 WORKDIR "app"
 
 # install code dependencies
-COPY "requirements.txt" .
+{% if envfile.split('/')[-1] == 'requirements.txt' %}
+COPY "{{ envfile }}" "requirements.txt"
 RUN ["pip", "install", "-r", "requirements.txt"]
+{% else %}
+COPY "{{ envfile }}" "environment.yml"
+RUN ["conda", "install", "-c", "conda-forge", "-p", "environment.yml"]
+{% endif %}
 
 # install environment dependencies
 COPY "run.sh" .
