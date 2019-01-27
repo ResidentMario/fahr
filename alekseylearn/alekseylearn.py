@@ -7,6 +7,14 @@ import re
 import docker
 import jinja2
 
+
+import logging
+logger = logging.getLogger(__name__)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter('%(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(handler)
+
+
 class TrainJob:
     def __init__(self, filepath, driver='sagemaker', envfile=None, overwrite=False, config=None):
         """
@@ -27,7 +35,7 @@ class TrainJob:
             Optional path to the file that defines the environment that will be built in the image.
             Must be either a "requirements.txt" file (which will be parsed with `pip`) or an
             "environment.yml" file (which will be parsed with `conda`). If left unspecified
-            whichever of these files is present in the build directory will be parsed.
+            whichever of these files is present in the build directory will be used.
         overwrite: bool
             If set to False `TrainJob` will respect any Dockerfile and run.sh files already present
             in the build directory. If set to True it will overwrite them.
@@ -78,6 +86,8 @@ class TrainJob:
             else:
                 envfile = conda_reqfile if conda_reqfile_exists else pip_reqfile
 
+        logger.info(f'Using "{envfile}" as envfile.')
+
         dockerfile = dirpath / 'Dockerfile'
         if not dockerfile.exists() or overwrite:
             create_dockerfile('sagemaker', dirpath, filepath.name, envfile)
@@ -100,7 +110,9 @@ class TrainJob:
         """
         Builds the model training image locally.
         """
-        self.docker_client.images.build(path=self.dirpath.as_posix(), tag=self.tag, rm=True)
+        path = self.dirpath.as_posix()
+        logger.info(f'Building "{self.tag}" container image from "{path}".')
+        self.docker_client.images.build(path=path, tag=self.tag, rm=True)
 
     def push(self):
         """
@@ -128,7 +140,14 @@ class TrainJob:
                 ecr_client.list_images(registryId=account_id, repositoryName=self.tag)
             except:
                 ecr_client.create_repository(repositoryName=self.tag)
+                logger.info(
+                    f'"{self.tag}" repository not found in ECR registry {account_id}. '
+                    'Creating it now.'
+                )
+            else:
+                logger.info(f'"{self.tag}" repository found in ECR registry {account_id}.')
 
+            logger.info(f'Retrieving auth token for ECR registry {account_id}.')
             token = ecr_client.get_authorization_token(registryIds=[account_id])
             encoded_auth = token['authorizationData'][0]['authorizationToken']
             username, password = base64.b64decode(encoded_auth).decode().split(':')
@@ -136,6 +155,7 @@ class TrainJob:
 
             self.docker_client.login(username, password, registry=registry)
             image.tag(repository, 'latest')
+            logger.info(f'Pushing image to ECR registry {account_id}.')
             self.docker_client.images.push(repository)
 
             self.session = session
@@ -175,6 +195,7 @@ class TrainJob:
                     # role = iam_client.create_role(RoleName='alekseylearn-test')
 
             sts_client = self.sts_client if hasattr(self, 'sts_client') else boto3.client('sts')
+            logger.info(f'Assuming IAM role {role_name}.')
             assumed_role_auth = sts_client.assume_role(
                 RoleArn=role_info['Role']['Arn'],
                 RoleSessionName='alekseylearn_test_session'
@@ -190,15 +211,22 @@ class TrainJob:
             if not hasattr(self, 'repository'):
                 _, _, self.repository = get_repository_info(session, self.tag, sts_client)
 
+            train_instance_count = self.config.pop('train_instance_count', 1)
+            train_instance_type = self.config.pop('train_instance_type', 'ml.c4.2xlarge')
+            output_path = self.config['output_path']
             clf = sage.estimator.Estimator(
                 self.repository, execution_role, 
-                self.config.pop('train_instance_count', 1), 
-                self.config.pop('train_instance_type', 'ml.c4.2xlarge'),
-                output_path=self.config['output_path'],
+                train_instance_count, train_instance_type,
+                output_path=output_path,
                 sagemaker_session=session
             )
 
             self.job_name = get_job_name(self.tag)
+            logger.info(
+                f'Fitting {self.tag} classifier with job name {self.job_name}. '
+                f'Using {train_instance_count}x {train_instance_type} compute instances. '
+                f'Model artifacts will be outputted to "{output_path}" S3 path.'
+            )
             clf.fit(job_name=self.job_name)
         else:
             raise NotImplementedError
@@ -225,6 +253,7 @@ class TrainJob:
             local_model_filepath = pathlib.Path(f'{path}/model.tar.gz').absolute().as_posix()
 
             s3_client = boto3.client('s3')
+            logger.info(f'Downloading model artifact to "{local_model_filepath}".')
             s3_client.download_file(bucket_name, model_path, local_model_filepath)
 
             if extract:
@@ -328,7 +357,7 @@ def get_job_name(tag):
 
 def validate_path(path):
     path = pathlib.Path(path)
-    if not path.exists:
+    if not path.exists():
         raise ValueError("Output parameter must point to an existing directory.")
     if not path.is_dir():
         raise ValueError("Output path must be a directory.")
