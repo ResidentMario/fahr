@@ -16,7 +16,7 @@ def cli():
 @click.option('--overwrite', default=False, help='If true, overwrite existing training artifacts.')
 @click.pass_context
 def fit(ctx, training_artifact_path, driver, envfile, overwrite):
-    config = fmt_ctx_args(ctx.args)
+    config = fmt_ctx(ctx)
     j = TrainJob(training_artifact_path, driver=driver, overwrite=overwrite, config=config)
     j.fit()
 
@@ -31,7 +31,7 @@ def fetch(local_path, tag, remote_path, driver, extract):
     _fetch(local_path, tag, remote_path, driver=driver, extract=extract)
 
 
-def fmt_ctx_args(ctx):
+def fmt_ctx(ctx):
     def fmt_ctx_arg(arg):
         if arg[:9] != '--config.':
             raise ValueError("Configuration arguments must be prefixed with `config`")

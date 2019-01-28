@@ -12,6 +12,7 @@ import jinja2
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(sys.stdout)
+logger.setLevel(logging.INFO)
 handler.setLevel(logging.INFO)
 handler.setFormatter(logging.Formatter('%(name)s - %(levelname)s - %(message)s'))
 logger.addHandler(handler)
@@ -230,6 +231,13 @@ class TrainJob:
                 f'Model artifacts will be outputted to "{output_path}" S3 path.'
             )
             clf.fit(job_name=self.job_name, wait=False)
+            landing_page = f'https://console.aws.amazon.com/sagemaker/'\
+                'home?region=us-east-1#/jobs/{self.job_name}'
+            logger.info(
+                f'The training job is now running. '
+                f'To track training progress visit {landing_page}. '
+                f'To download finished model artifacts use `fetch` or `TrainJob.fetch`.'
+            )
         else:
             raise NotImplementedError
 
