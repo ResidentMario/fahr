@@ -231,8 +231,10 @@ class TrainJob:
                 f'Model artifacts will be outputted to "{output_path}" S3 path.'
             )
             clf.fit(job_name=self.job_name, wait=False)
-            landing_page = f'https://console.aws.amazon.com/sagemaker/'\
-                'home?region=us-east-1#/jobs/{self.job_name}'
+            landing_page = (
+                f'https://console.aws.amazon.com/sagemaker/'
+                f'home?region=us-east-1#/jobs/{self.job_name}'
+            )
             logger.info(
                 f'The training job is now running. '
                 f'To track training progress visit {landing_page}. '
