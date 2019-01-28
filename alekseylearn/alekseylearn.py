@@ -3,14 +3,15 @@ import base64
 import pathlib
 import tarfile
 import re
+import logging
+import sys
 
 import docker
 import jinja2
 
 
-import logging
 logger = logging.getLogger(__name__)
-handler = logging.StreamHandler()
+handler = logging.StreamHandler(sys.stdout)
 handler.setLevel(logging.INFO)
 handler.setFormatter(logging.Formatter('%(name)s - %(levelname)s - %(message)s'))
 logger.addHandler(handler)
@@ -111,7 +112,6 @@ class TrainJob:
         """
         Builds the model training image locally.
         """
-        import pdb; pdb.set_trace()
         path = self.dirpath.as_posix()
         logger.info(f'Building "{self.tag}" container image from "{path}".')
         self.docker_client.images.build(path=path, tag=self.tag, rm=True)

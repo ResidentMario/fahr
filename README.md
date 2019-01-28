@@ -35,6 +35,8 @@ To successfully execute a job using the `sagemaker` driver ensure the following:
 * Your current IAM user has permission to get and assume a SageMaker-compatible role (see the next section).
 * There is either an `alekseylearn_sagemaker_role` [IAM role](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html) with the necessary permissions present in your account, or you pass a `'role_name'` to `config` parameterized with a role with the necessary permissions. SageMaker will [assume this role](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-service.html) to run your training job. Permissions required: SageMaker full access, ECR read-write access, S3 read-write access, EC2 run access. Note that the [default SageMaker-created role](https://docs.aws.amazon.com/sagemaker/latest/dg/automatic-model-tuning-ex-role.html) is insufficient.
 
+Note that training will be performed on one `ml.c4.2xlarge` instance by default, which provides 8 cores, 15 GB of RAM, and no GPU on a 2.9 GHz Intel Xeon. At time of writing this costs $0.557/hour. You can configure your own compute by passing `train_instance_count` and `train_instance_type` to `config`; for a list of alternative options see the [SageMaker pricing guide](https://aws.amazon.com/sagemaker/pricing/).
+
 ### `kaggle`
 Coming soon!
 
