@@ -17,6 +17,7 @@ def cli():
 @click.pass_context
 def fit(ctx, training_artifact_path, driver, envfile, overwrite):
     config = fmt_ctx(ctx)
+    overwrite = overwrite == 'True'
     j = TrainJob(training_artifact_path, driver=driver, overwrite=overwrite, config=config)
     j.fit()
 

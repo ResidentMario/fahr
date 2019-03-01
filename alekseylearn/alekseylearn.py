@@ -51,8 +51,10 @@ class TrainJob:
         dirpath = filepath.parent
         if not filepath.exists():
             raise ValueError('The training artifact points to a non-existent file.')
-        if filepath.suffix != '.ipynb':
-            raise NotImplementedError('Currently only Jupyter notebooks are supported.')
+        if filepath.suffix != '.ipynb' and filepath.suffix != '.py':
+            raise NotImplementedError(
+                'Currently only Jupyter notebooks and Python scripts are supported.'
+            )
         if driver != 'sagemaker':
             raise NotImplementedError('Currently only AWS SageMaker is supported.')
 
@@ -64,6 +66,7 @@ class TrainJob:
             if 'sagemaker' not in config['output_path']:
                 raise ValueError('"output_path" must contain the word "sagemaker".')
 
+        # TODO: experiment with using repo2docker for image config and build
         if envfile:
             envfile = pathlib.Path(envfile)
             if envfile.name != 'requirements.txt' and envfile.name != 'environment.yml':
@@ -91,6 +94,7 @@ class TrainJob:
 
         logger.info(f'Using "{envfile}" as envfile.')
 
+        envfile = envfile.absolute().relative_to(pathlib.Path.cwd()).as_posix()
         dockerfile = dirpath / 'Dockerfile'
         if not dockerfile.exists() or overwrite:
             create_dockerfile('sagemaker', dirpath, filepath.name, envfile)
@@ -381,8 +385,7 @@ def create_dockerfile(driver, dirpath, filepath, envfile):
     """
     if driver == 'sagemaker':
         create_template(
-            'sagemaker/Dockerfile', dirpath, 'Dockerfile', filepath=filepath,
-            envfile=str(envfile)
+            'sagemaker/Dockerfile', dirpath, 'Dockerfile', filepath=filepath, envfile=envfile
         )
     else:
         raise NotImplementedError
@@ -396,9 +399,13 @@ def create_runfile(driver, dirpath, filepath):
     if driver == 'sagemaker':
         if filepath.suffix == '.ipynb':
             run_cmd =\
-                "jupyter nbconvert --execute --ExecutePreprocessor.timeout=-1 "\
-                "--to notebook --inplace build.ipynb"
-            create_template('sagemaker/run.sh', dirpath, 'run.sh', run_cmd = run_cmd)
+                (f"jupyter nbconvert --execute --ExecutePreprocessor.timeout=-1 "
+                 f"--to notebook --inplace {filepath.name}")
+            create_template('sagemaker/run.sh', dirpath, 'run.sh', run_cmd=run_cmd)
+        elif filepath.suffix == '.py':
+            run_cmd =\
+                f"python {filepath.name}"
+            create_template('sagemaker/run.sh', dirpath, 'run.sh', run_cmd=run_cmd)                
         else:
             raise NotImplementedError
     else:
