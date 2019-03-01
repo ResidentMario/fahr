@@ -66,6 +66,13 @@ class TrainJob:
             if 'sagemaker' not in config['output_path']:
                 raise ValueError('"output_path" must contain the word "sagemaker".')
 
+            # Ensure that the job name is always a valid ARN name
+            tag = f'{dirpath.stem}/{filepath.stem}'
+            regex = '^[a-zA-Z0-9](-*[a-zA-Z0-9])*'
+            match = re.match(regex, tag.replace("/", "-").replace("_", "-")).span()[1] == len(tag)
+            if not match:
+                raise ValueError(f'"File name must satisfy regex {regex}"')
+
         # TODO: experiment with using repo2docker for image config and build
         if envfile:
             envfile = pathlib.Path(envfile)
@@ -111,7 +118,7 @@ class TrainJob:
         self.config = config
 
         self.docker_client = docker.client.from_env()
-        self.tag = f'{self.dirpath.stem}/{self.filepath.stem}'
+        self.tag = tag
 
     def build(self):
         """
@@ -427,9 +434,7 @@ def get_job_name(tag):
     # FIXME: support paginated requests, as otherwise most recent run can fall of the list
     sagemaker_client = boto3.client('sagemaker')
     finished_jobs = sagemaker_client.list_training_jobs()['TrainingJobSummaries']
-    # TODO: ensure that the job name is always a valid ARN name
-    # re.compile('^[a-zA-Z0-9](-*[a-zA-Z0-9])*').matchall(prefix) is not None
-    prefix = f'alekseylearn-{tag.replace("/", "-")}'
+    prefix = f'alekseylearn-{tag.replace("/", "-").replace("_", "-")}'
     previous_jobs = [j for j in finished_jobs if j['TrainingJobName'].startswith(prefix)]
     n = len(previous_jobs)
     job_name = f'{prefix}-{n}'
