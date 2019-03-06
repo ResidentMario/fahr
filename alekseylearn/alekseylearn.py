@@ -238,18 +238,26 @@ class TrainJob:
             self.job_name = get_next_job_name(self.tag)
             logger.info(
                 f'Fitting {self.tag} classifier with job name {self.job_name}. '
-                f'Using {train_instance_count}x {train_instance_type} compute instances. '
-                f'Model artifacts will be outputted to "{output_path}" S3 path.'
+                f'Using {train_instance_count}x {train_instance_type} compute instances.'
             )
             clf.fit(job_name=self.job_name, wait=False)
             landing_page = (
                 f'https://console.aws.amazon.com/sagemaker/'
-                f'home?region=us-east-1#/jobs/{self.job_name}'
+                f'home?#/jobs/{self.job_name}'
+            )
+            logs_page = (
+                f'https://console.aws.amazon.com/cloudwatch/'
+                f'home?#logStream:group=/aws/sagemaker/TrainingJobs;'
+                f'streamFilter=typeLogStreamPrefix'
+            )
+            download_cmd = (
+                f'alekseylearn fetch ./ "{self.tag}" "{output_path}"'
             )
             logger.info(
                 f'The training job is now running. '
                 f'To track training progress visit {landing_page}. '
-                f'To download finished model artifacts use `fetch` or `TrainJob.fetch`.'
+                f'To see training logs visit {logs_page}. '
+                f'To download finished model artifacts run {download_cmd} (or similar) after training is complete.'
             )
         else:
             raise NotImplementedError
@@ -277,8 +285,8 @@ class TrainJob:
             raise ValueError('Cannot fetch TrainJob model artifacts without fitting first.')
 
         return fetch(
-            local_path, self.tag, self.config['output_path'], extract=extract, 
-            job_name=self.job_name
+            local_path, self.tag, self.config['output_path'], 
+            extract=extract, job_name=self.job_name
         )
 
     def fit(self):
