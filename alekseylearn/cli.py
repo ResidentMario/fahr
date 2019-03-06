@@ -27,8 +27,9 @@ def fit(ctx, training_artifact_path, driver, envfile, overwrite):
 @click.argument('tag')
 @click.argument('remote_path')
 @click.option('--driver', default='sagemaker', help='Driver to be used for running the train job.')
-@click.option('--extract', default='sagemaker', help='Driver to be used for running the train job.')
+@click.option('--extract', default=True, help='Whether or not to untar the data on arrival.')
 def fetch(local_path, tag, remote_path, driver, extract):
+    extract = extract == 'True'
     _fetch(local_path, tag, remote_path, driver=driver, extract=extract)
 
 

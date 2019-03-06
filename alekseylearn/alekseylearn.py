@@ -235,7 +235,7 @@ class TrainJob:
                 sagemaker_session=session
             )
 
-            self.job_name = get_job_name(self.tag)
+            self.job_name = get_next_job_name(self.tag)
             logger.info(
                 f'Fitting {self.tag} classifier with job name {self.job_name}. '
                 f'Using {train_instance_count}x {train_instance_type} compute instances. '
@@ -344,9 +344,8 @@ def fetch(local_path, tag, remote_path, driver='sagemaker', extract=False, job_n
     if driver == 'sagemaker':
         import boto3
 
-        path = validate_path(path)
-
-        job_name = job_name if job_name is not None else get_job_name(tag)
+        path = validate_path(local_path)
+        job_name = job_name if job_name is not None else get_previous_job_name(tag)
         output_dir = remote_path
         bucket_name = output_dir.replace('s3://', '').split('/')[0]
         bucket_path = '/'.join(output_dir.replace('s3://', '').split('/')[1:])
@@ -428,7 +427,7 @@ def get_repository_info(session, tag, sts_client=None):
     return region, account_id, repository
 
 
-def get_job_name(tag):
+def get_previous_job_name(tag):
     import boto3
     
     # FIXME: support paginated requests, as otherwise most recent run can fall of the list
@@ -437,8 +436,15 @@ def get_job_name(tag):
     prefix = f'alekseylearn-{tag.replace("/", "-").replace("_", "-")}'
     previous_jobs = [j for j in finished_jobs if j['TrainingJobName'].startswith(prefix)]
     n = len(previous_jobs)
-    job_name = f'{prefix}-{n}'
+    job_name = f'{prefix}-{n - 1}'
     return job_name
+
+
+def get_next_job_name(tag):
+    previous_job_name = get_previous_job_name(tag)
+    previous_job_num = int(previous_job_name[-1])
+    next_job_num = previous_job_num + 1
+    return previous_job_name[:-1] + str(next_job_num)
 
 
 def validate_path(path):
