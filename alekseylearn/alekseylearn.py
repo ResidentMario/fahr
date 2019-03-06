@@ -62,9 +62,6 @@ class TrainJob:
         if driver == 'sagemaker':
             if config is None or 'output_path' not in config:
                 raise ValueError('The SageMaker driver requires an output_path to "s3://".')
-            # The default SageMaker role enforces this rule, so we should do so too.
-            if 'sagemaker' not in config['output_path']:
-                raise ValueError('"output_path" must contain the word "sagemaker".')
 
             # Ensure that the job name is always a valid ARN name
             tag = f'{dirpath.stem}/{filepath.stem}'
