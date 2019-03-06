@@ -50,14 +50,14 @@ Where:
 
 * `MODEL_ARTIFACT_FILEPATH` is the a path to the file defining the model artifact.
 * `S3_ARTIFACT_DIRECTORY` is the S3 directory the model artifact will be deposited in.
-* `MODEL_IMAGE_TAG` is the Docker image tag associated with the model. It is dependent on the model filepath: e.g. if `$MODEL_ARTIFACT_FILEPATH=.../foo/model.py` then `$MODEL_IMAGE_TAG=foo/model`.
+* `MODEL_IMAGE_TAG` is the Docker image tag associated with the model. It is dependent on the model filepath: e.g. if `MODEL_ARTIFACT_FILEPATH=.../foo/model.py` then `MODEL_IMAGE_TAG=foo/model`.
 * `EXECUTION_ROLE_NAME` is the nice name of a user role with the necessary permissions (if you are unsure what this means see the second bullet in "Configuration").
 
 #### Prerequisites
 
 * Your training artifact must write model artifact(s) to the `/opt/ml/model` folder at the end of its execution.
-* Your current IAM user must have permission to get and assume the `$EXECUTION_ROLE_NAME`. That role must have the following permissions: SageMaker full access, ECR read-write access, S3 read-write access, EC2 run access.
-* `$S3_ARTIFACT_DIRECTORY` must point to a path that your current IAM user has read access to.
+* Your current IAM user must have permission to get and assume the `EXECUTION_ROLE_NAME`. That role must have the following permissions: SageMaker full access, ECR read-write access, S3 read-write access, EC2 run access.
+* `S3_ARTIFACT_DIRECTORY` must point to a path that your current IAM user has read access to.
 * Your `output_path` includes the word "sagemaker" (this is for compatibility with the default roles SageMaker creates, which are scoped to only allow putting objects containing this fragment).
 
 #### What runs your job
