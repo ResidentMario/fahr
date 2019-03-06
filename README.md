@@ -38,8 +38,12 @@ Besides that, there are driver-specific configurations that must be set that are
 To run a `sagemaker` CLI job:
 
 ```bash
-$ alekseylearn fit $MODEL_ARTIFACT_FILEPATH --config.output_path=$S3_ARTIFACT_DIRECTORY --config.role_name=$EXECUTION_ROLE_NAME
-$ alekseylearn fetch $LOCAL_TARGET_DIRECTORY $MODEL_IMAGE_TAG $S3_ARTIFACT_FILEPATH
+$ alekseylearn fit $MODEL_ARTIFACT_FILEPATH \
+    --config.output_path=$S3_ARTIFACT_DIRECTORY \
+    --config.role_name=$EXECUTION_ROLE_NAME
+$ alekseylearn fetch $LOCAL_TARGET_DIRECTORY \
+    $MODEL_IMAGE_TAG \
+    $S3_ARTIFACT_FILEPATH
 ```
 
 Where:
