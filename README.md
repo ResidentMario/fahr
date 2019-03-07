@@ -2,14 +2,37 @@
 
 A simple CLI tool for running my machine learning training jobs on cloud compute. Intended for personal use, but it may eventually grow in scope to be something generally useful.
 
-Current job runners supported:
+## How it works
 
-* AWS SageMaker
+`alekseylearn` assumes you have a **training artifact**&mdash;a `.ipynb` or `.py` file which produces a saved model when executed&mdash;and outputs a **model artifact**&mdash;a file defining your resultant machine learning model.
+
+Generating a model artifact with `alekseylearn` requires doing the following:
+
+1. Building a Docker image based on your training artifact.
+2. Uploading that Docker image to a container registry.
+3. Executing that Docker image, saving the resulting model artifact somewhere.
+4. Downloading that model artifact to your local machine.
+
+This process requires an image build driver, a model training driver, a cloud storage service, and a container registry.
+
+However, you only need to worry about the image build driver and the model training driver, as all of the other services are dictated by your choice of model training driver.
+
+Current model training drivers supported:
+
+* `sagemaker` (AWS)
 
 Planned:
 
 * Kaggle Kernels
 * Google ML Flow
+
+Current image build drivers supported:
+
+* `local` (your local machine)
+
+Planned:
+
+* `ec2` (AWS)
 
 ## Before you begin
 
@@ -39,6 +62,8 @@ To run a `sagemaker` CLI job:
 
 ```bash
 $ alekseylearn fit $MODEL_ARTIFACT_FILEPATH \
+    --build_driver='local' \
+    --train_driver='sagemaker' \
     --config.output_path=$S3_ARTIFACT_DIRECTORY \
     --config.role_name=$EXECUTION_ROLE_NAME
 $ alekseylearn fetch $LOCAL_TARGET_DIRECTORY \
@@ -60,7 +85,7 @@ Where:
 * `S3_ARTIFACT_DIRECTORY` must point to a path that your current IAM user has read access to.
 * Your `output_path` includes the word "sagemaker" (this is for compatibility with the default roles SageMaker creates, which are scoped to only allow putting objects containing this fragment).
 
-#### What runs your job
+#### Further configuration
 
 Training will be performed on one `ml.c4.2xlarge` instance by default, which provides 8 cores, 15 GB of RAM, and no GPU on a 2.9 GHz Intel Xeon. At time of writing this costs $0.557/hour.
 

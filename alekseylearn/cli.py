@@ -11,14 +11,20 @@ def cli():
     name='fit', context_settings=dict(ignore_unknown_options=True, allow_extra_args=True)
 )
 @click.argument('training_artifact_path')
-@click.option('--driver', default='sagemaker', help='Driver to be used for running the train job.')
+@click.option('--train-driver', default='sagemaker',
+    help='Driver to be used for running the train job.')
+@click.option('--build-driver', default='local',
+    help='Driver to be used for building the model image.')
 @click.option('--envfile', default=None, help='Code environment definition file to build with.')
 @click.option('--overwrite', default=False, help='If true, overwrite existing training artifacts.')
 @click.pass_context
-def fit(ctx, training_artifact_path, driver, envfile, overwrite):
+def fit(ctx, training_artifact_path, train_driver, build_driver, envfile, overwrite):
     config = fmt_ctx(ctx)
     overwrite = overwrite == 'True'
-    j = TrainJob(training_artifact_path, driver=driver, overwrite=overwrite, config=config)
+    j = TrainJob(
+        training_artifact_path, build_driver=build_driver, train_driver=train_driver,
+        overwrite=overwrite, config=config
+    )
     j.fit()
 
 
@@ -30,7 +36,7 @@ def fit(ctx, training_artifact_path, driver, envfile, overwrite):
 @click.option('--extract', default=True, help='Whether or not to untar the data on arrival.')
 def fetch(local_path, tag, remote_path, driver, extract):
     extract = extract == 'True'
-    _fetch(local_path, tag, remote_path, driver=driver, extract=extract)
+    _fetch(local_path, tag, remote_path, train_driver=driver, extract=extract)
 
 
 def fmt_ctx(ctx):
