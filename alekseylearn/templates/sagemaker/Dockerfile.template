@@ -1,8 +1,8 @@
-{% if build_driver == 'local' -%}
+{% if build_driver == 'local' %}
 FROM python:3.6
-{% else -%}
+{% else %}
 FROM tensorflow/tensorflow:1.10.1-gpu-py3
-{% endif -%}
+{% endif %}
 
 # set the working directory
 RUN ["mkdir", "app"]
@@ -16,6 +16,9 @@ RUN ["pip", "install", "-r", "requirements.txt"]
 COPY "{{ envfile }}" "environment.yml"
 RUN ["conda", "install", "-c", "conda-forge", "-p", "environment.yml"]
 {% endif -%}
+
+# FIXME: temporary test
+RUN ["nvidia-smi"]
 
 # install environment dependencies
 COPY "run.sh" .

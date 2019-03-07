@@ -415,7 +415,7 @@ def create_dockerfile(build_driver, train_driver, dirpath, filepath, envfile):
     """
     if train_driver == 'sagemaker':
         create_template(
-            'sagemaker/Dockerfile.template', dirpath, 'Dockerfile', 
+            'sagemaker/Dockerfile', dirpath, 'Dockerfile', 
             filepath=filepath, envfile=envfile, build_driver=build_driver
         )
     else:
