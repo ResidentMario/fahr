@@ -34,8 +34,9 @@ class TrainJob:
         build_driver: str
             The driver (service) that will build the model training image. The options are:
 
-            * 'local' -- Builds the model container on your local machine.
-            * 'ec2' -- Builds the model container on an EC2 machine.
+            * 'local' -- Builds the model container on your local machine w/o GPU.
+            * 'local-gpu' -- Builds the model container on your local machine w/ GPU.
+        
         train_driver: str
             The driver (service) that will perform the training. Currently the options are:
 
@@ -65,7 +66,7 @@ class TrainJob:
             )
         if train_driver != 'sagemaker':
             raise NotImplementedError('Currently only AWS SageMaker is supported.')
-        if build_driver != 'local':
+        if build_driver != 'local' and build_driver != 'local-gpu':
             raise NotImplementedError('Currently only local Docker builds are supported.')
 
         # Check driver-specific configuration requirements
@@ -111,11 +112,11 @@ class TrainJob:
         envfile = envfile.absolute().relative_to(pathlib.Path.cwd()).as_posix()
         dockerfile = dirpath / 'Dockerfile'
         if not dockerfile.exists() or overwrite:
-            create_dockerfile('sagemaker', dirpath, filepath.name, envfile)
+            create_dockerfile(build_driver, train_driver, dirpath, filepath.name, envfile)
 
         runfile = dirpath / 'run.sh'
         if not runfile.exists() or overwrite:
-            create_runfile('sagemaker', dirpath, filepath)
+            create_runfile(build_driver, train_driver, dirpath, filepath)
 
         self.dirpath = dirpath
         self.filepath = filepath
@@ -132,7 +133,7 @@ class TrainJob:
         """
         Builds the model training image locally.
         """
-        if self.train_driver == 'local':
+        if self.build_driver == 'local' or self.build_driver == 'local-gpu':
             path = self.dirpath.as_posix()
             logger.info(f'Building "{self.tag}" container image from "{path}".')
             self.docker_client.images.build(path=path, tag=self.tag, rm=True)
@@ -395,12 +396,41 @@ def create_template(template_name, dirpath, filename, **kwargs):
         f.write(template_text)
 
 
-def create_dockerfile(train_driver, dirpath, filepath, envfile):
+def create_dockerfile(build_driver, train_driver, dirpath, filepath, envfile):
     """
-    Creates a Dockerfile compatible with the given `train_driver` and writes to to disk.
+    Creates a Dockerfile compatible with the given drivers and writes to to disk.
 
     Parameters
     ----------
+    build_driver: str
+        The build_driver (service) that will build the model image.
+    train_driver: str
+        The train_driver (service) that will perform the training.
+    dirpath: str
+        Path to the directory being bundled.
+    filepath: str
+        Name of the model training artifact being bundled.
+    envfile: str
+        Path to the environment file that will be built in the image.
+    """
+    if train_driver == 'sagemaker':
+        create_template(
+            'sagemaker/Dockerfile.template', dirpath, 'Dockerfile', 
+            filepath=filepath, envfile=envfile, build_driver=build_driver
+        )
+    else:
+        raise NotImplementedError
+
+
+def create_runfile(build_driver, train_driver, dirpath, filepath):
+    """
+    Creates a run.sh entrypoint for the Docker image compatible with the given `train_driver`,
+    and writes it to disk.
+
+    Parameters
+    ----------
+    build_driver: str
+        The build_driver (service) that will build the model image.
     train_driver: str
         The train_driver (service) that will perform the training.
     dirpath: str
@@ -409,28 +439,15 @@ def create_dockerfile(train_driver, dirpath, filepath, envfile):
         Name of the model training artifact being bundled.
     """
     if train_driver == 'sagemaker':
-        create_template(
-            'sagemaker/Dockerfile', dirpath, 'Dockerfile', filepath=filepath, envfile=envfile
-        )
-    else:
-        raise NotImplementedError
-
-
-def create_runfile(train_driver, dirpath, filepath):
-    """
-    Creates a run.sh entrypoint for the Docker image compatible with the given `train_driver`,
-    and writes it to disk.
-    """
-    if train_driver == 'sagemaker':
         if filepath.suffix == '.ipynb':
             run_cmd =\
                 (f"jupyter nbconvert --execute --ExecutePreprocessor.timeout=-1 "
                  f"--to notebook --inplace {filepath.name}")
-            create_template('sagemaker/run.sh', dirpath, 'run.sh', run_cmd=run_cmd)
+            create_template('sagemaker/run.template', dirpath, 'run.sh', run_cmd=run_cmd)
         elif filepath.suffix == '.py':
             run_cmd =\
                 f"python {filepath.name}"
-            create_template('sagemaker/run.sh', dirpath, 'run.sh', run_cmd=run_cmd)                
+            create_template('sagemaker/run.template', dirpath, 'run.sh', run_cmd=run_cmd)                
         else:
             raise NotImplementedError
     else:

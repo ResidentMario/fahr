@@ -1,17 +1,21 @@
+{% if build_driver == 'local' -%}
 FROM python:3.6
+{% else -%}
+FROM tensorflow/tensorflow:1.10.1-gpu-py3
+{% endif -%}
 
 # set the working directory
 RUN ["mkdir", "app"]
 WORKDIR "app"
 
 # install code dependencies
-{% if envfile.split('/')[-1] == 'requirements.txt' %}
+{% if envfile.split('/')[-1] == 'requirements.txt' -%}
 COPY "{{ envfile }}" "requirements.txt"
 RUN ["pip", "install", "-r", "requirements.txt"]
-{% else %}
+{% else -%}
 COPY "{{ envfile }}" "environment.yml"
 RUN ["conda", "install", "-c", "conda-forge", "-p", "environment.yml"]
-{% endif %}
+{% endif -%}
 
 # install environment dependencies
 COPY "run.sh" .
