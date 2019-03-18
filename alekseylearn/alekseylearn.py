@@ -11,11 +11,12 @@ import jinja2
 
 
 logger = logging.getLogger(__name__)
-handler = logging.StreamHandler(sys.stdout)
-logger.setLevel(logging.INFO)
-handler.setLevel(logging.INFO)
-handler.setFormatter(logging.Formatter('%(name)s - %(levelname)s - %(message)s'))
-logger.addHandler(handler)
+if not logger.handlers:
+    handler = logging.StreamHandler(sys.stdout)
+    logger.setLevel(logging.INFO)
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(logging.Formatter('%(name)s - %(levelname)s - %(message)s'))
+    logger.addHandler(handler)
 
 
 class TrainJob:
