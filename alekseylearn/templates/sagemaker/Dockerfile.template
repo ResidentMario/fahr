@@ -17,9 +17,6 @@ COPY "{{ envfile }}" "environment.yml"
 RUN ["conda", "install", "-c", "conda-forge", "-p", "environment.yml"]
 {% endif -%}
 
-# FIXME: temporary test
-RUN ["nvidia-smi"]
-
 # install environment dependencies
 COPY "run.sh" .
 COPY "{{ filepath }}" .
