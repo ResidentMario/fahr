@@ -112,11 +112,37 @@ class TrainJob:
 
         envfile = envfile.absolute().relative_to(pathlib.Path.cwd()).as_posix()
         dockerfile = dirpath / 'Dockerfile'
-        if not dockerfile.exists() or overwrite:
+        dockerfile_exists = dockerfile.exists()
+        if dockerfile_exists and not overwrite:
+            logger.info(
+                f'A Dockerfile already exists at "{dockerfile}" and "overwrite" is set to False. '
+                f'The existing Dockerfile will be reused.'
+            )
+        elif dockerfile_exists and overwrite:
+            logger.info(
+                f'A Dockerfile already exists at "{dockerfile}" and "overwrite" is set to True. '
+                f'Overwriting the file that is currently there.'
+            )
+            create_dockerfile(build_driver, train_driver, dirpath, filepath.name, envfile)
+        else:  # dockerfile_exists
+            logger.info(f'Creating new Dockerfile at "{dockerfile}".')
             create_dockerfile(build_driver, train_driver, dirpath, filepath.name, envfile)
 
         runfile = dirpath / 'run.sh'
-        if not runfile.exists() or overwrite:
+        runfile_exists = runfile.exists()
+        if runfile_exists and not overwrite:
+            logger.info(
+                f'An image entrypoint already exists at "{runfile}" and "overwrite" is set to False. '
+                f'The existing file will be reused.'
+            )
+        elif runfile_exists and overwrite:
+            logger.info(
+                f'An image entrypoint already exists at "{runfile}" and "overwrite" is set to True. '
+                f'Overwriting the file that is currently there.'
+            )
+            create_runfile(build_driver, train_driver, dirpath, filepath)
+        else:  # runfile_exists
+            logger.info(f'Creating new image entrypoint at "{runfile}".')
             create_runfile(build_driver, train_driver, dirpath, filepath)
 
         self.dirpath = dirpath
