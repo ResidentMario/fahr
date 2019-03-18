@@ -220,16 +220,31 @@ class TrainJob:
                     raise NotImplementedError
                     # role = iam_client.create_role(RoleName='alekseylearn-test')
 
+            # if the current execution context is not the `role_name` role, assume it
             sts_client = self.sts_client if hasattr(self, 'sts_client') else boto3.client('sts')
-            logger.info(f'Assuming IAM role {role_name}.')
-            assumed_role_auth = sts_client.assume_role(
-                RoleArn=role_info['Role']['Arn'],
-                RoleSessionName='alekseylearn_test_session'
-            )
+            current_execution_context_arn = sts_client.get_caller_identity()['Arn']
+
+            if f'assumed-role/{role_name}' in current_execution_context_arn:
+                logger.info(
+                    f'{role_name} is both the desired IAM role and the current execution context. '
+                    f'Creating a new session using the current session authorization credentials.'
+                )
+                aws_access_key_id, aws_secret_access_key, aws_session_token =\
+                    self.session.get_credentials().get_frozen_credentials()
+            else:
+                logger.info(f'Assuming IAM role {role_name}.')
+                auth = sts_client.assume_role(
+                    RoleArn=role_info['Role']['Arn'],
+                    RoleSessionName='alekseylearn_test_session'
+                )['Credentials']
+                aws_access_key_id, aws_secret_access_key, aws_session_token = (
+                    auth['AccessKeyId'], auth['AccessKeyId'], auth['SessionToken']
+                )
+
             assumed_role_session = boto3.session.Session(
-                aws_access_key_id = assumed_role_auth['Credentials']['AccessKeyId'],
-                aws_secret_access_key = assumed_role_auth['Credentials']['SecretAccessKey'], 
-                aws_session_token = assumed_role_auth['Credentials']['SessionToken']
+                aws_access_key_id=aws_access_key_id,
+                aws_secret_access_key=aws_secret_access_key, 
+                aws_session_token=aws_session_token
             )
             session = sage.Session(boto_session=assumed_role_session)
             execution_role = sage.get_execution_role(sagemaker_session=session)
