@@ -20,6 +20,10 @@ RUN ["conda", "install", "-c", "conda-forge", "-p", "environment.yml"]
 # install environment dependencies
 COPY "run.sh" .
 COPY "{{ filepath }}" .
+{% if build_driver == 'local-gpu' -%}
+ENV NVIDIA_VISIBLE_DEVICES all
+ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
+{% endif -%}
 
 # provision environment
 RUN ["chmod", "+x", "./run.sh"]
