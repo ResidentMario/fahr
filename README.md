@@ -4,11 +4,14 @@ A simple CLI tool for running my machine learning training jobs on cloud compute
 
 ## How it works
 
-`alekseylearn` assumes you have a **training artifact**&mdash;a `.ipynb` or `.py` file which produces a saved model when executed&mdash;and outputs a **model artifact**&mdash;a file defining your resultant machine learning model.
+First, some lingo:
+
+* **training artifact** &mdash; A file (either `.ipynb` or `.py`) which, when executed correctly, produces a model artifact, e.g. a model training script or notebook.
+* **model artifact** &mdash; A file which defines a machine learning model, e.g. a neural weight matrix.
 
 Generating a model artifact with `alekseylearn` requires doing the following:
 
-1. Building a Docker image based on your training artifact.
+1. Building a Docker image based on your training artifact (the folder containing it must also have a `requirements.txt` file defining dependencies).
 2. Uploading that Docker image to a container registry.
 3. Executing that Docker image, saving the resulting model artifact somewhere.
 4. Downloading that model artifact to your local machine.
@@ -29,24 +32,9 @@ Planned:
 Current image build drivers supported:
 
 * `local` (your local machine)
+* `local-gpu` (your local machine with GPU support)
 
-Planned:
-
-* `ec2` (AWS)
-
-## Before you begin
-
-First, some lingo:
-
-* **training artifact** &mdash; A file which, when executed correctly, produces a model artifact, e.g. a model training script or notebook.
-* **model artifact** &mdash; A file which defines a machine learning model, e.g. a neural weight matrix.
-
-All training jobs launched via `alekseylearn` require:
-
-* A path to a training artifact
-* A `requirements.txt` or `environment.yml` file in the directory containing the model artifact (or, pass a path to one: `--envfile=$PATH_TO_ENVFILE`).
-
-Besides that, there are driver-specific configurations that must be set that are documented in the sections that follow.
+There are driver-specific configurations that must be set that are documented in the sections that follow.
 
 ### `sagemaker`
 
@@ -83,7 +71,6 @@ Where:
 * Your training artifact must write model artifact(s) to the `/opt/ml/model` folder at the end of its execution.
 * Your current IAM user must have permission to get and assume the `EXECUTION_ROLE_NAME`. That role must have the following permissions: SageMaker full access, ECR read-write access, S3 read-write access, EC2 run access.
 * `S3_ARTIFACT_DIRECTORY` must point to a path that your current IAM user has read access to.
-* Your `output_path` includes the word "sagemaker" (this is for compatibility with the default roles SageMaker creates, which are scoped to only allow putting objects containing this fragment).
 
 #### Further configuration
 

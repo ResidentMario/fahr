@@ -46,9 +46,8 @@ class TrainJob:
             Future options include 'kaggle' and 'ml-engine'.
         envfile: str
             Optional path to the file that defines the environment that will be built in the image.
-            Must be either a "requirements.txt" file (which will be parsed with `pip`) or an
-            "environment.yml" file (which will be parsed with `conda`). If left unspecified
-            whichever of these files is present in the build directory will be used.
+            Must be a "requirements.txt" file (which will be parsed with `pip`). If left unspecified
+            the file present in the build directory will be used.
         overwrite: bool
             If set to False `TrainJob` will respect any Dockerfile and run.sh files already present
             in the build directory. If set to True it will overwrite them.
@@ -85,39 +84,19 @@ class TrainJob:
         # TODO: experiment with using repo2docker for image config and build
         if envfile:
             envfile = pathlib.Path(envfile)
-            if envfile.name != 'requirements.txt' and envfile.name != 'environment.yml':
+            if envfile.name != 'requirements.txt':
                 raise ValueError(
-                    '"envfile" must point to "requirements.txt" or "environment.yml" file'
+                    '"envfile" must point to "requirements.txt" file'
                 )
         else:
             pip_reqfile = dirpath / 'requirements.txt'
-            conda_reqfile = dirpath / 'environment.yml'
-
             pip_reqfile_exists = pip_reqfile.exists()
-            conda_reqfile_exists = conda_reqfile.exists()
-
-            if pip_reqfile_exists and conda_reqfile_exists:
-                raise ValueError(
-                    'Both requirements.txt and environment.yml are present. '
-                    'Please specify which to install from using the "envfile" parameter.'
-                )
-            if not pip_reqfile_exists and not conda_reqfile_exists:
-                raise ValueError(
-                    'No requirements.txt or environment.yml present and no "envfile" specified.'
-                )
+            if not pip_reqfile_exists:
+                raise ValueError('No requirements.txt present and no "envfile" specified.')
             else:
-                envfile = conda_reqfile if conda_reqfile_exists else pip_reqfile
+                envfile = pip_reqfile
 
         logger.info(f'Using "{envfile}" as envfile.')
-
-        # TODO: support conda environments
-        # see https://hub.docker.com/r/continuumio/miniconda/dockerfile and
-        # https://medium.com/@chadlagore/conda-environments-with-docker-82cdc9d25754
-        if envfile == conda_reqfile:
-            raise NotImplementedError(
-                "Dependency management via conda and environment.yml is not supported yet. "
-                "Please use pipenv and requirements.txt instead."
-            )
 
         envfile = envfile.absolute().relative_to(pathlib.Path.cwd()).as_posix()
         dockerfile = dirpath / 'Dockerfile'
