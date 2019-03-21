@@ -9,16 +9,13 @@ First, some lingo:
 * **training artifact** &mdash; A file (either `.ipynb` or `.py`) which, when executed correctly, produces a model artifact, e.g. a model training script or notebook.
 * **model artifact** &mdash; A file which defines a machine learning model, e.g. a neural weight matrix.
 
-Generating a model artifact with `alekseylearn` requires doing the following:
+`alekseylearn` turns a training artifact into a model artifact, using the magic of the cloud. Or, specifically, by:
 
-1. Building a Docker image based on your training artifact (the folder containing it must also have a `requirements.txt` file defining dependencies).
-2. Uploading that Docker image to a container registry.
-3. Executing that Docker image, saving the resulting model artifact somewhere.
-4. Downloading that model artifact to your local machine.
+1. Building a Docker image based on your training artifact and uploading it to a container registry.
+2. Executing that Docker image, saving the resulting model artifact somewhere.
+3. Downloading that model artifact to your local machine.
 
-This process requires an image build driver, a model training driver, a cloud storage service, and a container registry.
-
-However, you only need to worry about the image build driver and the model training driver, as all of the other services are dictated by your choice of model training driver.
+This process requires an image build driver, a model training driver, a cloud storage service, and a container registry. However you only need to configure the image build driver and the model training driver, as all of the other services are dictated by those choices.
 
 Current model training drivers supported:
 
@@ -31,18 +28,16 @@ Planned:
 
 Current image build drivers supported:
 
-* `local` (your local machine)
-* `local-gpu` (your local machine with GPU support)
+* `local`
+* `local-gpu`
 
-There are driver-specific configurations that must be set that are documented in the sections that follow.
+A `Dockerfile` and `run.sh` entrypoint are created for you automatically as part of the build process. You can generate just these files without actually launching a training job using the `alekseylearn init` command. You can also overwrite them yourself if you have custom configuration you want to do.
+
+Driver-specific configuration details are described in the sections that follow.
 
 ### `sagemaker`
 
 [AWS SageMaker](https://aws.amazon.com/sagemaker/) is Amazon AWS's fully managed machine learning platform.
-
-#### How it works
-
-`alekseylearn` will run the training job by building a custom SageMaker-compatible Docker image locally, then uploading that to AWS ECR. Then, it will execute that artifact using the AWS SageMaker API. The resulting model artifact will be sent to Amazon S3 blob storage, from which you retrieve it when the job is done.
 
 #### How to run it
 

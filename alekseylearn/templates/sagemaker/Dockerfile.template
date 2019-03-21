@@ -1,7 +1,7 @@
 {% if build_driver == 'local' -%}
-FROM python:3.6
+FROM python:latest
 {% else -%}
-FROM tensorflow/tensorflow:1.12.0-gpu-py3
+FROM tensorflow/tensorflow:latest-gpu-py3
 {% endif -%}
 
 # set the working directory
