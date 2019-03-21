@@ -45,8 +45,8 @@ To run a `sagemaker` CLI job:
 
 ```bash
 $ alekseylearn fit $MODEL_ARTIFACT_FILEPATH \
-    --build_driver='local' \
-    --train_driver='sagemaker' \
+    --build-driver='local' \
+    --train-driver='sagemaker' \
     --config.output_path=$S3_ARTIFACT_DIRECTORY \
     --config.role_name=$EXECUTION_ROLE_NAME
 $ alekseylearn fetch $LOCAL_TARGET_DIRECTORY \

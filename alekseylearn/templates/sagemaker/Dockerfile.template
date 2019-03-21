@@ -11,7 +11,7 @@ WORKDIR app
 
 # install code dependencies
 COPY {{ envfile }} requirements.txt
-pip install -r requirements.txt
+RUN pip install -r requirements.txt
 
 
 # install environment dependencies
