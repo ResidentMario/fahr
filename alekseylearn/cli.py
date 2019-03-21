@@ -9,7 +9,7 @@ def cli():
 
 def fit_wrapper(func):
     @click.command(
-        name='init', context_settings=dict(ignore_unknown_options=True, allow_extra_args=True)
+        name=func.__name__, context_settings=dict(ignore_unknown_options=True, allow_extra_args=True)
     )
     @click.argument('training_artifact_path')
     @click.option('--train-driver', default='sagemaker',

@@ -1,5 +1,6 @@
 #!/bin/bash
 if [[ "$1" = train ]]
 then
+    source activate runenv
     {{run_cmd}}
 fi

@@ -110,6 +110,15 @@ class TrainJob:
 
         logger.info(f'Using "{envfile}" as envfile.')
 
+        # TODO: support conda environments
+        # see https://hub.docker.com/r/continuumio/miniconda/dockerfile and
+        # https://medium.com/@chadlagore/conda-environments-with-docker-82cdc9d25754
+        if envfile == conda_reqfile:
+            raise NotImplementedError(
+                "Dependency management via conda and environment.yml is not supported yet. "
+                "Please use pipenv and requirements.txt instead."
+            )
+
         envfile = envfile.absolute().relative_to(pathlib.Path.cwd()).as_posix()
         dockerfile = dirpath / 'Dockerfile'
         dockerfile_exists = dockerfile.exists()
