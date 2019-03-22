@@ -5,6 +5,7 @@ import tarfile
 import re
 import logging
 import sys
+import shutil
 
 import docker
 import jinja2
@@ -99,39 +100,9 @@ class TrainJob:
         logger.info(f'Using "{envfile}" as envfile.')
 
         envfile = envfile.absolute().relative_to(pathlib.Path.cwd()).as_posix()
-        dockerfile = dirpath / 'Dockerfile'
-        dockerfile_exists = dockerfile.exists()
-        if dockerfile_exists and not overwrite:
-            logger.info(
-                f'A Dockerfile already exists at "{dockerfile}" and "overwrite" is set to False. '
-                f'The existing Dockerfile will be reused.'
-            )
-        elif dockerfile_exists and overwrite:
-            logger.info(
-                f'A Dockerfile already exists at "{dockerfile}" and "overwrite" is set to True. '
-                f'Overwriting the file that is currently there.'
-            )
-            create_dockerfile(build_driver, train_driver, dirpath, filepath.name, envfile)
-        else:  # dockerfile_exists
-            logger.info(f'Creating new Dockerfile at "{dockerfile}".')
-            create_dockerfile(build_driver, train_driver, dirpath, filepath.name, envfile)
-
-        runfile = dirpath / 'run.sh'
-        runfile_exists = runfile.exists()
-        if runfile_exists and not overwrite:
-            logger.info(
-                f'An image entrypoint already exists at "{runfile}" and "overwrite" is set to False. '
-                f'The existing file will be reused.'
-            )
-        elif runfile_exists and overwrite:
-            logger.info(
-                f'An image entrypoint already exists at "{runfile}" and "overwrite" is set to True. '
-                f'Overwriting the file that is currently there.'
-            )
-            create_runfile(build_driver, train_driver, dirpath, filepath)
-        else:  # runfile_exists
-            logger.info(f'Creating new image entrypoint at "{runfile}".')
-            create_runfile(build_driver, train_driver, dirpath, filepath)
+        dockerfile, runfile = create_resources(
+            build_driver, train_driver, dirpath, filepath, envfile, overwrite
+        )
 
         self.dirpath = dirpath
         self.filepath = filepath
@@ -414,6 +385,33 @@ def fetch(local_path, tag, remote_path, train_driver='sagemaker', extract=False,
         raise NotImplementedError
 
 
+def copy_resources(src, dest, overwrite=True):
+    """
+    Copies training file resources from `src` to `dest`.
+
+    Parameters
+    ----------
+    src: str
+        The source directory.
+    dest: str
+        The target directory.
+    overwrite: bool, default True
+        Whether or not to overwrite existing resources in the target directory.
+    """
+    src, dest = pathlib.Path(src), pathlib.Path(dest)
+    if not (src / 'Dockerfile').exists():
+        raise ValueError('No "Dockerfile" found in the source directory.')
+    if not (src / 'run.sh').exists():
+        raise ValueError('No "run.sh" entrypoint found in the source directory.')
+
+    if not (dest / 'Dockerfile').exists() or overwrite:
+        shutil.copy(str(src / 'Dockerfile'), str(dest / 'Dockerfile'))
+    if not (dest / 'run.sh').exists() or overwrite:
+        shutil.copy(str(src / 'run.sh'), str(dest / 'run.sh'))
+    
+    logger.info(f'Populated new Dockerfile and entrypoint in "{dest}".')
+
+
 def create_template(template_name, dirpath, filename, **kwargs):
     """
     Helper function for writing a parameterized template to disk.
@@ -484,7 +482,72 @@ def create_runfile(build_driver, train_driver, dirpath, filepath):
         raise NotImplementedError
 
 
+def create_resources(build_driver, train_driver, dirpath, filepath, envfile, overwrite):
+    """
+    Creates file resources that will be used by this library in a target directory 
+    (specifically, a Dockerfile and a run.sh entrypoint). Calls `create_runfile` and
+    `create_dockerfile` as a subroutine.
+
+    Parameters
+    ----------
+    build_driver: str
+        The build_driver (service) that will build the model image.
+    train_driver: str
+        The train_driver (service) that will perform the training.
+    dirpath: str
+        Path to the directory being bundled.
+    filepath: str
+        Name of the model training artifact being bundled.
+    envfile: str
+        Path to the environment file that will be built in the image.
+    overwrite: bool
+
+    Returns
+    -------
+    dockerfile, runfile: tuple
+        The filepaths written to.
+    """
+    dockerfile = dirpath / 'Dockerfile'
+    dockerfile_exists = dockerfile.exists()
+    if dockerfile_exists and not overwrite:
+        logger.info(
+            f'A Dockerfile already exists at "{dockerfile}" and "overwrite" is set to False. '
+            f'The existing Dockerfile will be reused.'
+        )
+    elif dockerfile_exists and overwrite:
+        logger.info(
+            f'A Dockerfile already exists at "{dockerfile}" and "overwrite" is set to True. '
+            f'Overwriting the file that is currently there.'
+        )
+        create_dockerfile(build_driver, train_driver, dirpath, filepath.name, envfile)
+    else:  # dockerfile_exists
+        logger.info(f'Creating new Dockerfile at "{dockerfile}".')
+        create_dockerfile(build_driver, train_driver, dirpath, filepath.name, envfile)
+
+    runfile = dirpath / 'run.sh'
+    runfile_exists = runfile.exists()
+    if runfile_exists and not overwrite:
+        logger.info(
+            f'An image entrypoint already exists at "{runfile}" and "overwrite" is set to False. '
+            f'The existing file will be reused.'
+        )
+    elif runfile_exists and overwrite:
+        logger.info(
+            f'An image entrypoint already exists at "{runfile}" and "overwrite" is set to True. '
+            f'Overwriting the file that is currently there.'
+        )
+        create_runfile(build_driver, train_driver, dirpath, filepath)
+    else:  # runfile_exists
+        logger.info(f'Creating new image entrypoint at "{runfile}".')
+        create_runfile(build_driver, train_driver, dirpath, filepath)  
+
+    return dockerfile, runfile
+
+
 def get_repository_info(session, tag, sts_client=None):
+    """
+    Identify the ECR repository for a given tag. SageMaker only.
+    """
     sts_client = sts_client if sts_client else session.client('sts')
     account_id = sts_client.get_caller_identity()['Account']
     region = session.region_name
@@ -494,6 +557,10 @@ def get_repository_info(session, tag, sts_client=None):
 
 
 def get_previous_job_name(tag):
+    """
+    Given the training run tag, determine the name of the job immediately previous to this
+    one, assuming one exists. SageMaker only.
+    """
     import boto3
     
     # FIXME: support paginated requests, as otherwise most recent run can fall of the list
@@ -501,12 +568,16 @@ def get_previous_job_name(tag):
     finished_jobs = sagemaker_client.list_training_jobs()['TrainingJobSummaries']
     prefix = f'fahr-{tag.replace("/", "-").replace("_", "-")}'
     previous_jobs = [j for j in finished_jobs if j['TrainingJobName'].startswith(prefix)]
-    n = len(previous_jobs)
+    n = len(previous_jobs) if previous_jobs else 1
     job_name = f'{prefix}-{n - 1}'
     return job_name
 
 
 def get_next_job_name(tag):
+    """
+    Given the training run tag, determine the appropriate name for the next job run.
+    SageMaker only.
+    """
     previous_job_name = get_previous_job_name(tag)
     previous_job_num = int(previous_job_name[-1])
     next_job_num = previous_job_num + 1
@@ -514,6 +585,9 @@ def get_next_job_name(tag):
 
 
 def validate_path(path):
+    """
+    Checks that a path exists and is a directory.
+    """
     path = pathlib.Path(path)
     if not path.exists():
         raise ValueError("Output parameter must point to an existing directory.")
@@ -521,4 +595,5 @@ def validate_path(path):
         raise ValueError("Output path must be a directory.")
     return path
 
-__all__ = ['TrainJob', 'fetch']
+
+__all__ = ['TrainJob', 'fetch', 'copy_resources']

@@ -1,6 +1,7 @@
 import click
 from .fahr import TrainJob
 from .fahr import fetch as _fetch
+from .fahr import copy_resources
 
 @click.group()
 def cli():
@@ -69,6 +70,16 @@ def fetch(local_path, tag, remote_path, driver, extract):
     _fetch(local_path, tag, remote_path, train_driver=driver, extract=extract)
 
 
+@click.command(name='copy')
+@click.argument('src')
+@click.argument('dest')
+@click.option('--overwrite', default=True, help='Whether or not to overwriting existing files.')
+def copy(src, dest, overwrite):
+    overwrite = overwrite == 'True'
+    copy_resources(src, dest, overwrite=overwrite)
+
+
 cli.add_command(fit)
 cli.add_command(fetch)
 cli.add_command(init)
+cli.add_command(copy)
