@@ -385,7 +385,7 @@ def fetch(local_path, tag, remote_path, train_driver='sagemaker', extract=False,
         raise NotImplementedError
 
 
-def copy_resources(src, dest, overwrite=True):
+def copy_resources(src, dest, overwrite=True, training_artifact=None):
     """
     Copies training file resources from `src` to `dest`.
 
@@ -397,19 +397,28 @@ def copy_resources(src, dest, overwrite=True):
         The target directory.
     overwrite: bool, default True
         Whether or not to overwrite existing resources in the target directory.
+    training_artifact: bool, default False
+        Whether or not to include the training artifact in the list of files copied.
     """
     src, dest = pathlib.Path(src), pathlib.Path(dest)
+
     if not (src / 'Dockerfile').exists():
         raise ValueError('No "Dockerfile" found in the source directory.')
     if not (src / 'run.sh').exists():
         raise ValueError('No "run.sh" entrypoint found in the source directory.')
+    if training_artifact is not None and not (src / training_artifact).exists():
+        raise ValueError(
+            f'Training artifact "{training_artifact}" not found in source directory.'
+        )
 
     if not (dest / 'Dockerfile').exists() or overwrite:
         shutil.copy(str(src / 'Dockerfile'), str(dest / 'Dockerfile'))
     if not (dest / 'run.sh').exists() or overwrite:
         shutil.copy(str(src / 'run.sh'), str(dest / 'run.sh'))
+    if not (dest / training_artifact).exists() or overwrite:
+        shutil.copy(str(src / training_artifact), str(dest / training_artifact))
     
-    logger.info(f'Populated new Dockerfile and entrypoint in "{dest}".')
+    logger.info(f'Copied files over to "{dest}".')
 
 
 def create_template(template_name, dirpath, filename, **kwargs):

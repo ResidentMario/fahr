@@ -18,7 +18,8 @@ def fit_wrapper(func):
     @click.option('--build-driver', default='local',
         help='Driver to be used for building the model image.')
     @click.option('--envfile', default=None, help='Code environment definition file to build with.')
-    @click.option('--overwrite', default=False, help='If true, overwrite existing training artifacts.')
+    @click.option('--overwrite', is_flag=True, default=False,
+        help='If true, overwrite existing training artifacts.')
     @click.pass_context
     def new_func(*args, **kwargs):
         func(*args, **kwargs)
@@ -41,7 +42,6 @@ def fmt_ctx(ctx):
 @fit_wrapper
 def fit(ctx, training_artifact_path, train_driver, build_driver, envfile, overwrite):
     config = fmt_ctx(ctx)
-    overwrite = overwrite == 'True'
     j = TrainJob(
         training_artifact_path, build_driver=build_driver, train_driver=train_driver,
         overwrite=overwrite, config=config
@@ -52,7 +52,6 @@ def fit(ctx, training_artifact_path, train_driver, build_driver, envfile, overwr
 @fit_wrapper
 def init(ctx, training_artifact_path, train_driver, build_driver, envfile, overwrite):
     config = fmt_ctx(ctx)
-    overwrite = overwrite == 'True'
     TrainJob(
         training_artifact_path, build_driver=build_driver, train_driver=train_driver,
         overwrite=overwrite, config=config
@@ -64,19 +63,27 @@ def init(ctx, training_artifact_path, train_driver, build_driver, envfile, overw
 @click.argument('tag')
 @click.argument('remote_path')
 @click.option('--driver', default='sagemaker', help='Driver to be used for running the train job.')
-@click.option('--extract', default=True, help='Whether or not to untar the data on arrival.')
+@click.option('--no-extract', default=False, is_flag=True,
+    help='Don\'t extract the data on arrival.')
 def fetch(local_path, tag, remote_path, driver, extract):
-    extract = extract == 'True'
     _fetch(local_path, tag, remote_path, train_driver=driver, extract=extract)
 
 
 @click.command(name='copy')
 @click.argument('src')
 @click.argument('dest')
-@click.option('--overwrite', default=True, help='Whether or not to overwriting existing files.')
-def copy(src, dest, overwrite):
-    overwrite = overwrite == 'True'
-    copy_resources(src, dest, overwrite=overwrite)
+@click.option('--overwrite', is_flag=True, default=False,
+    help='If true, overwrite existing job files.')
+@click.option('--include-training-artifact', default=None,
+    help='If set, the training artifact to copy.')
+def copy(src, dest, overwrite, include_training_artifact):
+    include_training_artifact = None if include_training_artifact == 'None' \
+        else include_training_artifact
+    copy_resources(
+        src, dest, 
+        overwrite=overwrite, 
+        training_artifact=include_training_artifact
+    )
 
 
 cli.add_command(fit)
