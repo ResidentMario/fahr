@@ -9,7 +9,7 @@ First, some lingo:
 * **training artifact** &mdash; A file (either `.ipynb` or `.py`) which, when executed correctly, produces a model artifact, e.g. a model training script or notebook.
 * **model artifact** &mdash; A file which defines a machine learning model, e.g. a neural weight matrix.
 
-`alekseylearn` turns a training artifact into a model artifact, using the magic of the cloud. Or, specifically, by:
+`fahr` turns a training artifact into a model artifact, using the magic of the cloud. Or, specifically, by:
 
 1. Building a Docker image based on your training artifact and uploading it to a container registry.
 2. Executing that Docker image, saving the resulting model artifact somewhere.
@@ -31,7 +31,7 @@ Current image build drivers supported:
 * `local`
 * `local-gpu`
 
-A `Dockerfile` and `run.sh` entrypoint are created for you automatically as part of the build process. You can generate just these files without actually launching a training job using the `alekseylearn init` command. You can also overwrite them yourself if you have custom configuration you want to do.
+A `Dockerfile` and `run.sh` entrypoint are created for you automatically as part of the build process. You can generate just these files without actually launching a training job using the `fahr init` command. You can also overwrite them yourself if you have custom configuration you want to do.
 
 Driver-specific configuration details are described in the sections that follow.
 
