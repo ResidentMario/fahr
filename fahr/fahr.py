@@ -219,7 +219,7 @@ class TrainJob:
 
             iam_client = boto3.client('iam')
 
-            default_role_name = 'alekseylearn_sagemaker_role'
+            default_role_name = 'fahr_sagemaker_role'
             role_name = self.config.pop('role_name', default_role_name)
             # TODO: try to catch the botocore.errorfactory.RepositoryNotFound error
             try:
@@ -233,7 +233,7 @@ class TrainJob:
                     # TODO: step through the flow for creating the default if it doesn't exist
                     # https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user.html
                     raise NotImplementedError
-                    # role = iam_client.create_role(RoleName='alekseylearn-test')
+                    # role = iam_client.create_role(RoleName='fahr-test')
 
             # if the current execution context is not the `role_name` role, assume it
             sts_client = self.sts_client if hasattr(self, 'sts_client') else boto3.client('sts')
@@ -250,7 +250,7 @@ class TrainJob:
                 logger.info(f'Assuming IAM role {role_name}.')
                 auth = sts_client.assume_role(
                     RoleArn=role_info['Role']['Arn'],
-                    RoleSessionName='alekseylearn_test_session'
+                    RoleSessionName='fahr_session'
                 )['Credentials']
                 aws_access_key_id, aws_secret_access_key, aws_session_token = (
                     auth['AccessKeyId'], auth['AccessKeyId'], auth['SessionToken']
@@ -293,7 +293,7 @@ class TrainJob:
                 f'streamFilter=typeLogStreamPrefix'
             )
             download_cmd = (
-                f'alekseylearn fetch ./ "{self.tag}" "{output_path}"'
+                f'fahr fetch ./ "{self.tag}" "{output_path}"'
             )
             logger.info(
                 f'The training job is now running. '
@@ -418,7 +418,7 @@ def create_template(template_name, dirpath, filename, **kwargs):
     """
     Helper function for writing a parameterized template to disk.
     """
-    template_env = jinja2.Environment(loader=jinja2.PackageLoader('alekseylearn', 'templates'))
+    template_env = jinja2.Environment(loader=jinja2.PackageLoader('fahr', 'templates'))
     template_text = template_env.get_template(template_name).render(
         **kwargs
     )
@@ -499,7 +499,7 @@ def get_previous_job_name(tag):
     # FIXME: support paginated requests, as otherwise most recent run can fall of the list
     sagemaker_client = boto3.client('sagemaker')
     finished_jobs = sagemaker_client.list_training_jobs()['TrainingJobSummaries']
-    prefix = f'alekseylearn-{tag.replace("/", "-").replace("_", "-")}'
+    prefix = f'fahr-{tag.replace("/", "-").replace("_", "-")}'
     previous_jobs = [j for j in finished_jobs if j['TrainingJobName'].startswith(prefix)]
     n = len(previous_jobs)
     job_name = f'{prefix}-{n - 1}'

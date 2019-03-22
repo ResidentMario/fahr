@@ -1,4 +1,4 @@
-# alekseylearn
+# fahr
 
 A simple CLI tool for running my machine learning training jobs on cloud compute. Intended for personal use, but it may eventually grow in scope to be something generally useful.
 
@@ -44,12 +44,12 @@ Driver-specific configuration details are described in the sections that follow.
 To run a `sagemaker` CLI job:
 
 ```bash
-$ alekseylearn fit $MODEL_ARTIFACT_FILEPATH \
+$ fahr fit $MODEL_ARTIFACT_FILEPATH \
     --build-driver='local' \
     --train-driver='sagemaker' \
     --config.output_path=$S3_ARTIFACT_DIRECTORY \
     --config.role_name=$EXECUTION_ROLE_NAME
-$ alekseylearn fetch $LOCAL_TARGET_DIRECTORY \
+$ fahr fetch $LOCAL_TARGET_DIRECTORY \
     $MODEL_IMAGE_TAG \
     $S3_ARTIFACT_FILEPATH
 ```

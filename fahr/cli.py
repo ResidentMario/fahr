@@ -1,6 +1,6 @@
 import click
-from .alekseylearn import TrainJob
-from .alekseylearn import fetch as _fetch
+from .fahr import TrainJob
+from .fahr import fetch as _fetch
 
 @click.group()
 def cli():
