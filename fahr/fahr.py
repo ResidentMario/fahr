@@ -577,9 +577,7 @@ def get_previous_job_name(tag):
     finished_jobs = sagemaker_client.list_training_jobs()['TrainingJobSummaries']
     prefix = f'fahr-{tag.replace("/", "-").replace("_", "-")}'
     previous_jobs = [j for j in finished_jobs if j['TrainingJobName'].startswith(prefix)]
-    n = len(previous_jobs) if previous_jobs else 1
-    job_name = f'{prefix}-{n - 1}'
-    return job_name
+    return f'{prefix}-{len(previous_jobs)}' if previous_jobs else None
 
 
 def get_next_job_name(tag):
@@ -588,9 +586,13 @@ def get_next_job_name(tag):
     SageMaker only.
     """
     previous_job_name = get_previous_job_name(tag)
-    previous_job_num = int(previous_job_name[-1])
-    next_job_num = previous_job_num + 1
-    return previous_job_name[:-1] + str(next_job_num)
+
+    if previous_job_name:
+        previous_job_num = int(previous_job_name[-1])
+        next_job_num = previous_job_num + 1
+        return f'{previous_job_name[:-1]}{str(next_job_num)}'
+    else:
+        return f'{tag}-1'
 
 
 def validate_path(path):
