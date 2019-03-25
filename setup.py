@@ -6,8 +6,11 @@ setup(
     extras_require={
         # drivers require addtl packages
         'sagemaker': ['boto3', 'sagemaker'],
-        # develop contains all addtl packages required by the drivers
-        'develop': ['boto3', 'sagemaker']
+        # develop contains all addtl packages
+        'develop': [
+            'sphinx', 'sphinx_rtd_theme',  # docs
+            'boto3', 'sagemaker'  # sagemaker
+        ]
     },
     py_modules=['fahr'],
     version='0.0.1',
