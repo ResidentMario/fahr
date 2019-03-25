@@ -76,9 +76,9 @@ class TrainJob:
                 raise ValueError('The SageMaker driver requires an output_path to "s3://".')
 
             # Ensure that the job name is always a valid ARN name
-            tag = f'{dirpath.stem}/{filepath.stem}'
+            tag = f'{dirpath.stem}/{filepath.stem}'.replace("/", "-").replace("_", "-")
             regex = '^[a-zA-Z0-9](-*[a-zA-Z0-9])*'
-            match = re.match(regex, tag.replace("/", "-").replace("_", "-")).span()[1] == len(tag)
+            match = re.match(regex, tag).span()[1] == len(tag)
             if not match:
                 raise ValueError(f'"File name must satisfy regex {regex}"')
 
@@ -410,6 +410,8 @@ def copy_resources(src, dest, overwrite=True, training_artifact=None):
         raise ValueError('No "Dockerfile" found in the source directory.')
     if not (src / 'run.sh').exists():
         raise ValueError('No "run.sh" entrypoint found in the source directory.')
+    if not (src / 'requirements.txt').exists():
+        raise ValueError('No "requirements.txt" found in the source directory.')        
     if training_artifact is not None and not (src / training_artifact).exists():
         raise ValueError(
             f'Training artifact "{training_artifact}" not found in source directory.'
@@ -419,7 +421,10 @@ def copy_resources(src, dest, overwrite=True, training_artifact=None):
         shutil.copy(str(src / 'Dockerfile'), str(dest / 'Dockerfile'))
     if not (dest / 'run.sh').exists() or overwrite:
         shutil.copy(str(src / 'run.sh'), str(dest / 'run.sh'))
-    if not (dest / training_artifact).exists() or overwrite:
+    if not (dest / 'requirements.txt').exists() or overwrite:
+        shutil.copy(str(src / 'requirements.txt'), str(dest / 'requirements.txt'))
+    if (training_artifact is not None
+        and (not (dest / training_artifact).exists() or overwrite)):
         shutil.copy(str(src / training_artifact), str(dest / training_artifact))
     
     logger.info(f'Copied files over to "{dest}".')
