@@ -371,15 +371,19 @@ def fetch(local_path, tag, remote_path, train_driver='sagemaker', extract=False,
         bucket_name = output_dir.replace('s3://', '').split('/')[0]
         bucket_path = '/'.join(output_dir.replace('s3://', '').split('/')[1:])
         model_path = f'{bucket_path}{job_name}/output/model.tar.gz'
-        local_model_filepath = pathlib.Path(f'{path}/model.tar.gz').absolute().as_posix()
+        local_model_filepath = pathlib.Path(f'{path}/model.tar.gz').absolute()
+        local_model_filepath_str = local_model_filepath.as_posix()
+        local_model_directory_str = f'{local_model_filepath.parent.as_posix()}/'
 
         s3_client = boto3.client('s3')
-        logger.info(f'Downloading model artifact to "{local_model_filepath}".')
-        s3_client.download_file(bucket_name, model_path, local_model_filepath)
+        s3_client.download_file(bucket_name, model_path, local_model_filepath_str)
 
         if extract:
-            tarfile.open(local_model_filepath).extractall()
-            pathlib.Path(local_model_filepath).unlink()
+            tarfile.open(local_model_filepath_str).extractall()
+            pathlib.Path(local_model_filepath_str).unlink()
+            logger.info(f'Downloaded model artifact(s) to "{local_model_directory_str}".')
+        else:
+            logger.info(f'Downloaded model artifact(s) to "{local_model_filepath_str}".')
 
     else:
         raise NotImplementedError
