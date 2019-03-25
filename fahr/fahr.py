@@ -601,7 +601,7 @@ def get_next_job_name(tag):
         next_job_num = previous_job_num + 1
         return f'{previous_job_name[:-1]}{str(next_job_num)}'
     else:
-        return f'{tag}-1'
+        return f'fahr-{tag}-1'
 
 
 def validate_path(path):
