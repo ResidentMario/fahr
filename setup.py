@@ -1,10 +1,13 @@
 from setuptools import setup
 setup(
     name='fahr',
-    packages=['fahr'], # this must be the same as the name above
+    packages=['fahr'],
     install_requires=['docker', 'jinja2', 'click'],
     extras_require={
-        'sagemaker': ['boto3', 'sagemaker']
+        # drivers require addtl packages
+        'sagemaker': ['boto3', 'sagemaker'],
+        # develop contains all addtl packages required by the drivers
+        'develop': ['boto3', 'sagemaker']
     },
     py_modules=['fahr'],
     version='0.0.1',
