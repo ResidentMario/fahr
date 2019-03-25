@@ -34,7 +34,8 @@
   <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="search.html" /> 
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Quickstart" href="quickstart.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -79,20 +80,22 @@
               
             
             
-              <!-- Local TOC -->
-              <div class="local-toc"><ul>
-<li><a class="reference internal" href="#">fahr package</a><ul>
-<li><a class="reference internal" href="#submodules">Submodules</a></li>
-<li><a class="reference internal" href="#fahr-cli-module">fahr.cli module</a></li>
-<li><a class="reference internal" href="#fahr-fahr-module">fahr.fahr module</a></li>
-<li><a class="reference internal" href="#module-contents">Module contents</a></li>
+              <p class="caption"><span class="caption-text">Sections</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">fahr package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-fahr.cli">fahr.cli module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-fahr.fahr">fahr.fahr module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-fahr">Module contents</a></li>
 </ul>
 </li>
 </ul>
-</div>
+
             
           
     <a href="quickstart.html">Quickstart</a>
+    <a href="fahr.html">API Reference</a>
   
         </div>
       </div>
@@ -159,14 +162,246 @@
 <div class="section" id="submodules">
 <h2>Submodules<a class="headerlink" href="#submodules" title="Permalink to this headline">¶</a></h2>
 </div>
-<div class="section" id="fahr-cli-module">
-<h2>fahr.cli module<a class="headerlink" href="#fahr-cli-module" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="module-fahr.cli">
+<span id="fahr-cli-module"></span><h2>fahr.cli module<a class="headerlink" href="#module-fahr.cli" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="fahr.cli.fit_wrapper">
+<code class="descclassname">fahr.cli.</code><code class="descname">fit_wrapper</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/cli.html#fit_wrapper"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.cli.fit_wrapper" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="fahr.cli.fmt_ctx">
+<code class="descclassname">fahr.cli.</code><code class="descname">fmt_ctx</code><span class="sig-paren">(</span><em>ctx</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/cli.html#fmt_ctx"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.cli.fmt_ctx" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
 </div>
-<div class="section" id="fahr-fahr-module">
-<h2>fahr.fahr module<a class="headerlink" href="#fahr-fahr-module" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="module-fahr.fahr">
+<span id="fahr-fahr-module"></span><h2>fahr.fahr module<a class="headerlink" href="#module-fahr.fahr" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="fahr.fahr.TrainJob">
+<em class="property">class </em><code class="descclassname">fahr.fahr.</code><code class="descname">TrainJob</code><span class="sig-paren">(</span><em>filepath</em>, <em>build_driver='local'</em>, <em>train_driver='sagemaker'</em>, <em>envfile=None</em>, <em>overwrite=False</em>, <em>config=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#TrainJob"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.fahr.TrainJob" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="method">
+<dt id="fahr.fahr.TrainJob.build">
+<code class="descname">build</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#TrainJob.build"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.fahr.TrainJob.build" title="Permalink to this definition">¶</a></dt>
+<dd><p>Builds the model training image locally.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="fahr.fahr.TrainJob.fetch">
+<code class="descname">fetch</code><span class="sig-paren">(</span><em>local_path</em>, <em>extract=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#TrainJob.fetch"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.fahr.TrainJob.fetch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Extracts the model artifacts generated by the training job to <cite>path</cite>.</p>
+<p>This method is a convenience wrapper over the <cite>fetch</cite> static method. Use this method to
+fetch model artifacts generated by executing <cite>train</cite> on the current <cite>TrainingJob</cite> instance.
+Use the static method to fetch model artifacts from other runs.</p>
+<dl class="docutils">
+<dt>local_path: str or pathlib.Path</dt>
+<dd>Directory to write the model artifact to.</dd>
+<dt>extract: bool, default True</dt>
+<dd>Whether or not to untar the data on arrival.</dd>
+</dl>
+<p>ValueError – Raised if you attempt to <cite>fetch</cite> without first running <cite>fit</cite>.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="fahr.fahr.TrainJob.fit">
+<code class="descname">fit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#TrainJob.fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.fahr.TrainJob.fit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Executes a model training job, generating a model training artifact in a local repository.</p>
+<dl class="docutils">
+<dt>path: str or pathlib.Path</dt>
+<dd>Directory to write the model artifact to.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="fahr.fahr.TrainJob.push">
+<code class="descname">push</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#TrainJob.push"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.fahr.TrainJob.push" title="Permalink to this definition">¶</a></dt>
+<dd><p>Pushes the model training image to a remote repository. The repository used depends on the
+<cite>train_driver</cite>:</p>
+<ul class="simple">
+<li>‘sagemaker’ – Pushes the image to Amazon ECR.</li>
+</ul>
+</dd></dl>
+
+<dl class="method">
+<dt id="fahr.fahr.TrainJob.run">
+<code class="descname">run</code><span class="sig-paren">(</span><em>path</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#TrainJob.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.fahr.TrainJob.run" title="Permalink to this definition">¶</a></dt>
+<dd><p>Executes a model training job from start to finish, generating a model training artifact 
+in a local repository.</p>
+<dl class="docutils">
+<dt>path: str or pathlib.Path</dt>
+<dd>Directory to write the model artifact to.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="fahr.fahr.TrainJob.train">
+<code class="descname">train</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#TrainJob.train"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.fahr.TrainJob.train" title="Permalink to this definition">¶</a></dt>
+<dd><p>Launches a remote training job. Where the job is launched depends on the <cite>train_driver</cite>:</p>
+<ul class="simple">
+<li>sagemaker – The job is run on an EC2 machine via the AWS SageMaker API.</li>
+</ul>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="fahr.fahr.fetch">
+<code class="descclassname">fahr.fahr.</code><code class="descname">fetch</code><span class="sig-paren">(</span><em>local_path</em>, <em>tag</em>, <em>remote_path</em>, <em>train_driver='sagemaker'</em>, <em>extract=False</em>, <em>job_name=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#fetch"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.fahr.fetch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Extracts model artifacts generated by a prior <cite>TrainingJob</cite> to <cite>local_path</cite>.</p>
+<p>Used by <cite>TrainingJob.fetch</cite> and by the CLI.</p>
+<dl class="docutils">
+<dt>local_path: str or pathlib.Path</dt>
+<dd>Directory to write the model artifact to.</dd>
+<dt>tag: str</dt>
+<dd>The tag of the</dd>
+<dt>remote_path: str</dt>
+<dd>The root directory that the model artifact got written to.
+This should be the same as the <cite>config.output_path</cite> of the <cite>TrainingJob</cite> that generated
+this model artifact.</dd>
+<dt>train_driver: str</dt>
+<dd>The train_driver (service) that will perform the training. Cf. the <cite>TrainJob</cite> docstring.</dd>
+<dt>extract: bool, default True</dt>
+<dd>Whether or not to untar the data on arrival.</dd>
+<dt>job_name: str or None</dt>
+<dd><p class="first">The name of the job used to generate the model artifact. If omitted, the most recent model
+artifact associated with the given <cite>tag</cite> will be downloaded. If included, the model artifact
+associated with this specific job will be downloaded.</p>
+<p class="last">This parameter is primarily intended for use by the <cite>TrainJob.fetch</cite> object method.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="fahr.fahr.copy_resources">
+<code class="descclassname">fahr.fahr.</code><code class="descname">copy_resources</code><span class="sig-paren">(</span><em>src</em>, <em>dest</em>, <em>overwrite=True</em>, <em>training_artifact=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#copy_resources"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.fahr.copy_resources" title="Permalink to this definition">¶</a></dt>
+<dd><p>Copies training file resources from <cite>src</cite> to <cite>dest</cite>.</p>
+<dl class="docutils">
+<dt>src: str</dt>
+<dd>The source directory.</dd>
+<dt>dest: str</dt>
+<dd>The target directory.</dd>
+<dt>overwrite: bool, default True</dt>
+<dd>Whether or not to overwrite existing resources in the target directory.</dd>
+<dt>training_artifact: bool, default False</dt>
+<dd>Whether or not to include the training artifact in the list of files copied.</dd>
+</dl>
+</dd></dl>
+
 </div>
-<div class="section" id="module-contents">
-<h2>Module contents<a class="headerlink" href="#module-contents" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="module-fahr">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-fahr" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="fahr.TrainJob">
+<em class="property">class </em><code class="descclassname">fahr.</code><code class="descname">TrainJob</code><span class="sig-paren">(</span><em>filepath</em>, <em>build_driver='local'</em>, <em>train_driver='sagemaker'</em>, <em>envfile=None</em>, <em>overwrite=False</em>, <em>config=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#TrainJob"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.TrainJob" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="method">
+<dt id="fahr.TrainJob.build">
+<code class="descname">build</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#TrainJob.build"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.TrainJob.build" title="Permalink to this definition">¶</a></dt>
+<dd><p>Builds the model training image locally.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="fahr.TrainJob.fetch">
+<code class="descname">fetch</code><span class="sig-paren">(</span><em>local_path</em>, <em>extract=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#TrainJob.fetch"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.TrainJob.fetch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Extracts the model artifacts generated by the training job to <cite>path</cite>.</p>
+<p>This method is a convenience wrapper over the <cite>fetch</cite> static method. Use this method to
+fetch model artifacts generated by executing <cite>train</cite> on the current <cite>TrainingJob</cite> instance.
+Use the static method to fetch model artifacts from other runs.</p>
+<dl class="docutils">
+<dt>local_path: str or pathlib.Path</dt>
+<dd>Directory to write the model artifact to.</dd>
+<dt>extract: bool, default True</dt>
+<dd>Whether or not to untar the data on arrival.</dd>
+</dl>
+<p>ValueError – Raised if you attempt to <cite>fetch</cite> without first running <cite>fit</cite>.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="fahr.TrainJob.fit">
+<code class="descname">fit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#TrainJob.fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.TrainJob.fit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Executes a model training job, generating a model training artifact in a local repository.</p>
+<dl class="docutils">
+<dt>path: str or pathlib.Path</dt>
+<dd>Directory to write the model artifact to.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="fahr.TrainJob.push">
+<code class="descname">push</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#TrainJob.push"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.TrainJob.push" title="Permalink to this definition">¶</a></dt>
+<dd><p>Pushes the model training image to a remote repository. The repository used depends on the
+<cite>train_driver</cite>:</p>
+<ul class="simple">
+<li>‘sagemaker’ – Pushes the image to Amazon ECR.</li>
+</ul>
+</dd></dl>
+
+<dl class="method">
+<dt id="fahr.TrainJob.run">
+<code class="descname">run</code><span class="sig-paren">(</span><em>path</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#TrainJob.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.TrainJob.run" title="Permalink to this definition">¶</a></dt>
+<dd><p>Executes a model training job from start to finish, generating a model training artifact 
+in a local repository.</p>
+<dl class="docutils">
+<dt>path: str or pathlib.Path</dt>
+<dd>Directory to write the model artifact to.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="fahr.TrainJob.train">
+<code class="descname">train</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#TrainJob.train"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.TrainJob.train" title="Permalink to this definition">¶</a></dt>
+<dd><p>Launches a remote training job. Where the job is launched depends on the <cite>train_driver</cite>:</p>
+<ul class="simple">
+<li>sagemaker – The job is run on an EC2 machine via the AWS SageMaker API.</li>
+</ul>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="fahr.fetch">
+<code class="descclassname">fahr.</code><code class="descname">fetch</code><span class="sig-paren">(</span><em>local_path</em>, <em>tag</em>, <em>remote_path</em>, <em>train_driver='sagemaker'</em>, <em>extract=False</em>, <em>job_name=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#fetch"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.fetch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Extracts model artifacts generated by a prior <cite>TrainingJob</cite> to <cite>local_path</cite>.</p>
+<p>Used by <cite>TrainingJob.fetch</cite> and by the CLI.</p>
+<dl class="docutils">
+<dt>local_path: str or pathlib.Path</dt>
+<dd>Directory to write the model artifact to.</dd>
+<dt>tag: str</dt>
+<dd>The tag of the</dd>
+<dt>remote_path: str</dt>
+<dd>The root directory that the model artifact got written to.
+This should be the same as the <cite>config.output_path</cite> of the <cite>TrainingJob</cite> that generated
+this model artifact.</dd>
+<dt>train_driver: str</dt>
+<dd>The train_driver (service) that will perform the training. Cf. the <cite>TrainJob</cite> docstring.</dd>
+<dt>extract: bool, default True</dt>
+<dd>Whether or not to untar the data on arrival.</dd>
+<dt>job_name: str or None</dt>
+<dd><p class="first">The name of the job used to generate the model artifact. If omitted, the most recent model
+artifact associated with the given <cite>tag</cite> will be downloaded. If included, the model artifact
+associated with this specific job will be downloaded.</p>
+<p class="last">This parameter is primarily intended for use by the <cite>TrainJob.fetch</cite> object method.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="fahr.copy_resources">
+<code class="descclassname">fahr.</code><code class="descname">copy_resources</code><span class="sig-paren">(</span><em>src</em>, <em>dest</em>, <em>overwrite=True</em>, <em>training_artifact=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#copy_resources"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.copy_resources" title="Permalink to this definition">¶</a></dt>
+<dd><p>Copies training file resources from <cite>src</cite> to <cite>dest</cite>.</p>
+<dl class="docutils">
+<dt>src: str</dt>
+<dd>The source directory.</dd>
+<dt>dest: str</dt>
+<dd>The target directory.</dd>
+<dt>overwrite: bool, default True</dt>
+<dd>Whether or not to overwrite existing resources in the target directory.</dd>
+<dt>training_artifact: bool, default False</dt>
+<dd>Whether or not to include the training artifact in the list of files copied.</dd>
+</dl>
+</dd></dl>
+
 </div>
 </div>
 
@@ -175,6 +410,13 @@
            
           </div>
           <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="quickstart.html" class="btn btn-neutral float-left" title="Quickstart" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
   
 
   <hr/>

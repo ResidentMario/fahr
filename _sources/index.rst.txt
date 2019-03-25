@@ -15,8 +15,6 @@ AWS SageMaker and Kaggle Kernels. By offloading model training to the cloud,
 
 For a brief introduction refer to the `Quickstart`_.
 
-For library internals, see the `API Reference`_.
-
 .. _Quickstart: https://residentmario.github.io/fahr/quickstart.html
 .. _API Reference: https://residentmario.github.io/fahr/fahr.html
 
@@ -25,4 +23,14 @@ For library internals, see the `API Reference`_.
    :maxdepth: 2
    :caption: Sections
 
-   sources/quickstart.rst
+   quickstart.rst
+   fahr.rst
+
+
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`

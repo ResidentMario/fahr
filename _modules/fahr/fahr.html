@@ -1,0 +1,807 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>fahr.fahr &mdash; fahr 0.0.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> fahr
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+    
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Sections</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../fahr.html">fahr package</a></li>
+</ul>
+
+            
+          
+    <a href="quickstart.html">Quickstart</a>
+    <a href="fahr.html">API Reference</a>
+  
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">fahr</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>fahr.fahr</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for fahr.fahr</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">io</span> <span class="k">import</span> <span class="n">StringIO</span>
+<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span> <span class="nn">pathlib</span>
+<span class="kn">import</span> <span class="nn">tarfile</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">shutil</span>
+
+<span class="kn">import</span> <span class="nn">docker</span>
+<span class="kn">import</span> <span class="nn">jinja2</span>
+
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">logger</span><span class="o">.</span><span class="n">handlers</span><span class="p">:</span>
+    <span class="n">handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">StreamHandler</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+    <span class="n">handler</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+    <span class="n">handler</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%(name)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">))</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="TrainJob"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.TrainJob">[docs]</a><span class="k">class</span> <span class="nc">TrainJob</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">,</span> <span class="n">build_driver</span><span class="o">=</span><span class="s1">&#39;local&#39;</span><span class="p">,</span> <span class="n">train_driver</span><span class="o">=</span><span class="s1">&#39;sagemaker&#39;</span><span class="p">,</span> 
+        <span class="n">envfile</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Trains a machine learning model on the cloud.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        filepath: str</span>
+<span class="sd">            Path to the model training artifact to be executed remotely. </span>
+<span class="sd">            Currently only Jupyter notebooks are supported.</span>
+<span class="sd">        build_driver: str</span>
+<span class="sd">            The driver (service) that will build the model training image. The options are:</span>
+
+<span class="sd">            * &#39;local&#39; -- Builds the model container on your local machine w/o GPU.</span>
+<span class="sd">            * &#39;local-gpu&#39; -- Builds the model container on your local machine w/ GPU.</span>
+<span class="sd">        </span>
+<span class="sd">        train_driver: str</span>
+<span class="sd">            The driver (service) that will perform the training. Currently the options are:</span>
+
+<span class="sd">            * &#39;sagemaker&#39; -- Launches a model training job on Amazon using AWS SageMaker.</span>
+
+<span class="sd">            Future options include &#39;kaggle&#39; and &#39;ml-engine&#39;.</span>
+<span class="sd">        envfile: str</span>
+<span class="sd">            Optional path to the file that defines the environment that will be built in the image.</span>
+<span class="sd">            Must be a &quot;requirements.txt&quot; file (which will be parsed with `pip`). If left unspecified</span>
+<span class="sd">            the file present in the build directory will be used.</span>
+<span class="sd">        overwrite: bool</span>
+<span class="sd">            If set to False `TrainJob` will respect any Dockerfile and run.sh files already present</span>
+<span class="sd">            in the build directory. If set to True it will overwrite them.</span>
+<span class="sd">        config: dict</span>
+<span class="sd">            A dict of driver-specific configuration variables used to inform how the job is run.</span>
+<span class="sd">            The precise list of configuration options differs from driver to driver. See the</span>
+<span class="sd">            documentation for more information.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">filepath</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span>
+        <span class="n">dirpath</span> <span class="o">=</span> <span class="n">filepath</span><span class="o">.</span><span class="n">parent</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;The training artifact points to a non-existent file.&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">filepath</span><span class="o">.</span><span class="n">suffix</span> <span class="o">!=</span> <span class="s1">&#39;.ipynb&#39;</span> <span class="ow">and</span> <span class="n">filepath</span><span class="o">.</span><span class="n">suffix</span> <span class="o">!=</span> <span class="s1">&#39;.py&#39;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+                <span class="s1">&#39;Currently only Jupyter notebooks and Python scripts are supported.&#39;</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">train_driver</span> <span class="o">!=</span> <span class="s1">&#39;sagemaker&#39;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s1">&#39;Currently only AWS SageMaker is supported.&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">build_driver</span> <span class="o">!=</span> <span class="s1">&#39;local&#39;</span> <span class="ow">and</span> <span class="n">build_driver</span> <span class="o">!=</span> <span class="s1">&#39;local-gpu&#39;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s1">&#39;Currently only local Docker builds are supported.&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Check driver-specific configuration requirements</span>
+        <span class="k">if</span> <span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;sagemaker&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">config</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="s1">&#39;output_path&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">config</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;The SageMaker driver requires an output_path to &quot;s3://&quot;.&#39;</span><span class="p">)</span>
+
+            <span class="c1"># Ensure that the job name is always a valid ARN name</span>
+            <span class="n">tag</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{dirpath.stem}</span><span class="s1">/</span><span class="si">{filepath.stem}</span><span class="s1">&#39;</span>
+            <span class="n">regex</span> <span class="o">=</span> <span class="s1">&#39;^[a-zA-Z0-9](-*[a-zA-Z0-9])*&#39;</span>
+            <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">regex</span><span class="p">,</span> <span class="n">tag</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">span</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">match</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;&quot;File name must satisfy regex </span><span class="si">{regex}</span><span class="s1">&quot;&#39;</span><span class="p">)</span>
+
+        <span class="c1"># TODO: experiment with using repo2docker for image config and build</span>
+        <span class="k">if</span> <span class="n">envfile</span><span class="p">:</span>
+            <span class="n">envfile</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">envfile</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">envfile</span><span class="o">.</span><span class="n">name</span> <span class="o">!=</span> <span class="s1">&#39;requirements.txt&#39;</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s1">&#39;&quot;envfile&quot; must point to &quot;requirements.txt&quot; file&#39;</span>
+                <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">pip_reqfile</span> <span class="o">=</span> <span class="n">dirpath</span> <span class="o">/</span> <span class="s1">&#39;requirements.txt&#39;</span>
+            <span class="n">pip_reqfile_exists</span> <span class="o">=</span> <span class="n">pip_reqfile</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">pip_reqfile_exists</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;No requirements.txt present and no &quot;envfile&quot; specified.&#39;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">envfile</span> <span class="o">=</span> <span class="n">pip_reqfile</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Using &quot;</span><span class="si">{envfile}</span><span class="s1">&quot; as envfile.&#39;</span><span class="p">)</span>
+
+        <span class="n">envfile</span> <span class="o">=</span> <span class="n">envfile</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="o">.</span><span class="n">cwd</span><span class="p">())</span><span class="o">.</span><span class="n">as_posix</span><span class="p">()</span>
+        <span class="n">dockerfile</span><span class="p">,</span> <span class="n">runfile</span> <span class="o">=</span> <span class="n">create_resources</span><span class="p">(</span>
+            <span class="n">build_driver</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">,</span> <span class="n">envfile</span><span class="p">,</span> <span class="n">overwrite</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">dirpath</span> <span class="o">=</span> <span class="n">dirpath</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span> <span class="o">=</span> <span class="n">filepath</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dockerfile</span> <span class="o">=</span> <span class="n">dockerfile</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runfile</span> <span class="o">=</span> <span class="n">runfile</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">build_driver</span> <span class="o">=</span> <span class="n">build_driver</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">train_driver</span> <span class="o">=</span> <span class="n">train_driver</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">config</span> <span class="o">=</span> <span class="n">config</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">docker_client</span> <span class="o">=</span> <span class="n">docker</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">from_env</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tag</span> <span class="o">=</span> <span class="n">tag</span>
+
+<div class="viewcode-block" id="TrainJob.build"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.TrainJob.build">[docs]</a>    <span class="k">def</span> <span class="nf">build</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Builds the model training image locally.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">build_driver</span> <span class="o">==</span> <span class="s1">&#39;local&#39;</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">build_driver</span> <span class="o">==</span> <span class="s1">&#39;local-gpu&#39;</span><span class="p">:</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dirpath</span><span class="o">.</span><span class="n">as_posix</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Building &quot;</span><span class="si">{self.tag}</span><span class="s1">&quot; container image from &quot;</span><span class="si">{path}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">docker_client</span><span class="o">.</span><span class="n">images</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">path</span><span class="p">,</span> <span class="n">tag</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="n">rm</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+<div class="viewcode-block" id="TrainJob.push"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.TrainJob.push">[docs]</a>    <span class="k">def</span> <span class="nf">push</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Pushes the model training image to a remote repository. The repository used depends on the</span>
+<span class="sd">        `train_driver`:</span>
+
+<span class="sd">        * &#39;sagemaker&#39; -- Pushes the image to Amazon ECR.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;sagemaker&#39;</span><span class="p">:</span>
+            <span class="kn">import</span> <span class="nn">boto3</span>
+            <span class="kn">from</span> <span class="nn">docker.errors</span> <span class="k">import</span> <span class="n">ImageNotFound</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">image</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">docker_client</span><span class="o">.</span><span class="n">images</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">ImageNotFound</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;The </span><span class="si">{self.tag}</span><span class="s1"> image does not exist locally.&#39;</span><span class="p">)</span>
+
+            <span class="n">session</span> <span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
+            <span class="n">sts_client</span> <span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s1">&#39;sts&#39;</span><span class="p">)</span>
+            <span class="n">ecr_client</span> <span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s1">&#39;ecr&#39;</span><span class="p">)</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">account_id</span><span class="p">,</span> <span class="n">repository</span> <span class="o">=</span> <span class="n">get_repository_info</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="n">sts_client</span><span class="p">)</span>
+
+            <span class="c1"># TODO: try to catch the botocore.errorfactory.RepositoryNotFound error</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">ecr_client</span><span class="o">.</span><span class="n">list_images</span><span class="p">(</span><span class="n">registryId</span><span class="o">=</span><span class="n">account_id</span><span class="p">,</span> <span class="n">repositoryName</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">)</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="n">ecr_client</span><span class="o">.</span><span class="n">create_repository</span><span class="p">(</span><span class="n">repositoryName</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="n">f</span><span class="s1">&#39;&quot;</span><span class="si">{self.tag}</span><span class="s1">&quot; repository not found in ECR registry </span><span class="si">{account_id}</span><span class="s1">. &#39;</span>
+                    <span class="s1">&#39;Creating it now.&#39;</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;&quot;</span><span class="si">{self.tag}</span><span class="s1">&quot; repository found in ECR registry </span><span class="si">{account_id}</span><span class="s1">.&#39;</span><span class="p">)</span>
+
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Retrieving auth token for ECR registry </span><span class="si">{account_id}</span><span class="s1">.&#39;</span><span class="p">)</span>
+            <span class="n">token</span> <span class="o">=</span> <span class="n">ecr_client</span><span class="o">.</span><span class="n">get_authorization_token</span><span class="p">(</span><span class="n">registryIds</span><span class="o">=</span><span class="p">[</span><span class="n">account_id</span><span class="p">])</span>
+            <span class="n">encoded_auth</span> <span class="o">=</span> <span class="n">token</span><span class="p">[</span><span class="s1">&#39;authorizationData&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;authorizationToken&#39;</span><span class="p">]</span>
+            <span class="n">username</span><span class="p">,</span> <span class="n">password</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">encoded_auth</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)</span>
+            <span class="n">registry</span> <span class="o">=</span> <span class="n">token</span><span class="p">[</span><span class="s1">&#39;authorizationData&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;proxyEndpoint&#39;</span><span class="p">]</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">docker_client</span><span class="o">.</span><span class="n">login</span><span class="p">(</span><span class="n">username</span><span class="p">,</span> <span class="n">password</span><span class="p">,</span> <span class="n">registry</span><span class="o">=</span><span class="n">registry</span><span class="p">)</span>
+            <span class="n">image</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">repository</span><span class="p">,</span> <span class="s1">&#39;latest&#39;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Pushing image to ECR registry </span><span class="si">{account_id}</span><span class="s1">.&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">docker_client</span><span class="o">.</span><span class="n">images</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="n">repository</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">session</span> <span class="o">=</span> <span class="n">session</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">repository</span> <span class="o">=</span> <span class="n">repository</span>
+            <span class="c1"># TODO: does reusing the client actually save a network request?</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">sts_client</span> <span class="o">=</span> <span class="n">sts_client</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+<div class="viewcode-block" id="TrainJob.train"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.TrainJob.train">[docs]</a>    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Launches a remote training job. Where the job is launched depends on the `train_driver`:</span>
+
+<span class="sd">        * sagemaker -- The job is run on an EC2 machine via the AWS SageMaker API.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;sagemaker&#39;</span><span class="p">:</span>
+            <span class="kn">import</span> <span class="nn">boto3</span>
+            <span class="kn">import</span> <span class="nn">sagemaker</span> <span class="k">as</span> <span class="nn">sage</span>
+
+            <span class="n">iam_client</span> <span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s1">&#39;iam&#39;</span><span class="p">)</span>
+
+            <span class="n">default_role_name</span> <span class="o">=</span> <span class="s1">&#39;fahr_sagemaker_role&#39;</span>
+            <span class="n">role_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;role_name&#39;</span><span class="p">,</span> <span class="n">default_role_name</span><span class="p">)</span>
+            <span class="c1"># TODO: try to catch the botocore.errorfactory.RepositoryNotFound error</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">role_info</span> <span class="o">=</span> <span class="n">iam_client</span><span class="o">.</span><span class="n">get_role</span><span class="p">(</span><span class="n">RoleName</span><span class="o">=</span><span class="n">role_name</span><span class="p">)</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">role_name</span> <span class="o">!=</span> <span class="n">default_role_name</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="n">f</span><span class="s1">&#39;The </span><span class="si">{role_name}</span><span class="s1"> role does not exist, you must create it first.&#39;</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># TODO: step through the flow for creating the default if it doesn&#39;t exist</span>
+                    <span class="c1"># https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user.html</span>
+                    <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+                    <span class="c1"># role = iam_client.create_role(RoleName=&#39;fahr-test&#39;)</span>
+
+            <span class="c1"># if the current execution context is not the `role_name` role, assume it</span>
+            <span class="n">sts_client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sts_client</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;sts_client&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="n">boto3</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s1">&#39;sts&#39;</span><span class="p">)</span>
+            <span class="n">current_execution_context_arn</span> <span class="o">=</span> <span class="n">sts_client</span><span class="o">.</span><span class="n">get_caller_identity</span><span class="p">()[</span><span class="s1">&#39;Arn&#39;</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="n">f</span><span class="s1">&#39;assumed-role/</span><span class="si">{role_name}</span><span class="s1">&#39;</span> <span class="ow">in</span> <span class="n">current_execution_context_arn</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="n">f</span><span class="s1">&#39;</span><span class="si">{role_name}</span><span class="s1"> is both the desired IAM role and the current execution context. &#39;</span>
+                    <span class="n">f</span><span class="s1">&#39;Creating a new session using the current session authorization credentials.&#39;</span>
+                <span class="p">)</span>
+                <span class="n">aws_access_key_id</span><span class="p">,</span> <span class="n">aws_secret_access_key</span><span class="p">,</span> <span class="n">aws_session_token</span> <span class="o">=</span>\
+                    <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">get_credentials</span><span class="p">()</span><span class="o">.</span><span class="n">get_frozen_credentials</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Assuming IAM role </span><span class="si">{role_name}</span><span class="s1">.&#39;</span><span class="p">)</span>
+                <span class="n">auth</span> <span class="o">=</span> <span class="n">sts_client</span><span class="o">.</span><span class="n">assume_role</span><span class="p">(</span>
+                    <span class="n">RoleArn</span><span class="o">=</span><span class="n">role_info</span><span class="p">[</span><span class="s1">&#39;Role&#39;</span><span class="p">][</span><span class="s1">&#39;Arn&#39;</span><span class="p">],</span>
+                    <span class="n">RoleSessionName</span><span class="o">=</span><span class="s1">&#39;fahr_session&#39;</span>
+                <span class="p">)[</span><span class="s1">&#39;Credentials&#39;</span><span class="p">]</span>
+                <span class="n">aws_access_key_id</span><span class="p">,</span> <span class="n">aws_secret_access_key</span><span class="p">,</span> <span class="n">aws_session_token</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">auth</span><span class="p">[</span><span class="s1">&#39;AccessKeyId&#39;</span><span class="p">],</span> <span class="n">auth</span><span class="p">[</span><span class="s1">&#39;AccessKeyId&#39;</span><span class="p">],</span> <span class="n">auth</span><span class="p">[</span><span class="s1">&#39;SessionToken&#39;</span><span class="p">]</span>
+                <span class="p">)</span>
+
+            <span class="n">assumed_role_session</span> <span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">Session</span><span class="p">(</span>
+                <span class="n">aws_access_key_id</span><span class="o">=</span><span class="n">aws_access_key_id</span><span class="p">,</span>
+                <span class="n">aws_secret_access_key</span><span class="o">=</span><span class="n">aws_secret_access_key</span><span class="p">,</span> 
+                <span class="n">aws_session_token</span><span class="o">=</span><span class="n">aws_session_token</span>
+            <span class="p">)</span>
+            <span class="n">session</span> <span class="o">=</span> <span class="n">sage</span><span class="o">.</span><span class="n">Session</span><span class="p">(</span><span class="n">boto_session</span><span class="o">=</span><span class="n">assumed_role_session</span><span class="p">)</span>
+            <span class="n">execution_role</span> <span class="o">=</span> <span class="n">sage</span><span class="o">.</span><span class="n">get_execution_role</span><span class="p">(</span><span class="n">sagemaker_session</span><span class="o">=</span><span class="n">session</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;repository&#39;</span><span class="p">):</span>
+                <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">repository</span> <span class="o">=</span> <span class="n">get_repository_info</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="n">sts_client</span><span class="p">)</span>
+
+            <span class="n">train_instance_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;train_instance_count&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">train_instance_type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;train_instance_type&#39;</span><span class="p">,</span> <span class="s1">&#39;ml.c4.2xlarge&#39;</span><span class="p">)</span>
+            <span class="n">output_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;output_path&#39;</span><span class="p">]</span>
+            <span class="n">clf</span> <span class="o">=</span> <span class="n">sage</span><span class="o">.</span><span class="n">estimator</span><span class="o">.</span><span class="n">Estimator</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">repository</span><span class="p">,</span> <span class="n">execution_role</span><span class="p">,</span> 
+                <span class="n">train_instance_count</span><span class="p">,</span> <span class="n">train_instance_type</span><span class="p">,</span>
+                <span class="n">output_path</span><span class="o">=</span><span class="n">output_path</span><span class="p">,</span>
+                <span class="n">sagemaker_session</span><span class="o">=</span><span class="n">session</span>
+            <span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">job_name</span> <span class="o">=</span> <span class="n">get_next_job_name</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="n">f</span><span class="s1">&#39;Fitting </span><span class="si">{self.tag}</span><span class="s1"> classifier with job name </span><span class="si">{self.job_name}</span><span class="s1">. &#39;</span>
+                <span class="n">f</span><span class="s1">&#39;Using </span><span class="si">{train_instance_count}</span><span class="s1">x </span><span class="si">{train_instance_type}</span><span class="s1"> compute instances.&#39;</span>
+            <span class="p">)</span>
+            <span class="n">clf</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">job_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">job_name</span><span class="p">,</span> <span class="n">wait</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">landing_page</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">f</span><span class="s1">&#39;https://console.aws.amazon.com/sagemaker/&#39;</span>
+                <span class="n">f</span><span class="s1">&#39;home?#/jobs/</span><span class="si">{self.job_name}</span><span class="s1">&#39;</span>
+            <span class="p">)</span>
+            <span class="n">logs_page</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">f</span><span class="s1">&#39;https://console.aws.amazon.com/cloudwatch/&#39;</span>
+                <span class="n">f</span><span class="s1">&#39;home?#logStream:group=/aws/sagemaker/TrainingJobs;&#39;</span>
+                <span class="n">f</span><span class="s1">&#39;streamFilter=typeLogStreamPrefix&#39;</span>
+            <span class="p">)</span>
+            <span class="n">download_cmd</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">f</span><span class="s1">&#39;fahr fetch ./ &quot;</span><span class="si">{self.tag}</span><span class="s1">&quot; &quot;</span><span class="si">{output_path}</span><span class="s1">&quot;&#39;</span>
+            <span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="n">f</span><span class="s1">&#39;The training job is now running. &#39;</span>
+                <span class="n">f</span><span class="s1">&#39;To track training progress visit </span><span class="si">{landing_page}</span><span class="s1">. &#39;</span>
+                <span class="n">f</span><span class="s1">&#39;To see training logs visit </span><span class="si">{logs_page}</span><span class="s1">. &#39;</span>
+                <span class="n">f</span><span class="s1">&#39;To download finished model artifacts run </span><span class="si">{download_cmd}</span><span class="s1"> (or similar) after training is complete.&#39;</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+<div class="viewcode-block" id="TrainJob.fetch"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.TrainJob.fetch">[docs]</a>    <span class="k">def</span> <span class="nf">fetch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">local_path</span><span class="p">,</span> <span class="n">extract</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extracts the model artifacts generated by the training job to `path`.</span>
+
+<span class="sd">        This method is a convenience wrapper over the `fetch` static method. Use this method to</span>
+<span class="sd">        fetch model artifacts generated by executing `train` on the current `TrainingJob` instance.</span>
+<span class="sd">        Use the static method to fetch model artifacts from other runs.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        local_path: str or pathlib.Path</span>
+<span class="sd">            Directory to write the model artifact to.</span>
+<span class="sd">        extract: bool, default True</span>
+<span class="sd">            Whether or not to untar the data on arrival.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError -- Raised if you attempt to `fetch` without first running `fit`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;job_name&#39;</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Cannot fetch TrainJob model artifacts without fitting first.&#39;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">fetch</span><span class="p">(</span>
+            <span class="n">local_path</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;output_path&#39;</span><span class="p">],</span> 
+            <span class="n">extract</span><span class="o">=</span><span class="n">extract</span><span class="p">,</span> <span class="n">job_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">job_name</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="TrainJob.fit"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.TrainJob.fit">[docs]</a>    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Executes a model training job, generating a model training artifact in a local repository.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        path: str or pathlib.Path</span>
+<span class="sd">            Directory to write the model artifact to.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">push</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">train</span><span class="p">()</span></div>
+
+
+    <span class="c1"># TODO: remote this method entirely in favor of fit-fetch?</span>
+<div class="viewcode-block" id="TrainJob.run"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.TrainJob.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Executes a model training job from start to finish, generating a model training artifact </span>
+<span class="sd">        in a local repository.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        path: str or pathlib.Path</span>
+<span class="sd">            Directory to write the model artifact to.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">validate_path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">push</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="fetch"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.fetch">[docs]</a><span class="k">def</span> <span class="nf">fetch</span><span class="p">(</span><span class="n">local_path</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span> <span class="n">remote_path</span><span class="p">,</span> <span class="n">train_driver</span><span class="o">=</span><span class="s1">&#39;sagemaker&#39;</span><span class="p">,</span> <span class="n">extract</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">job_name</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Extracts model artifacts generated by a prior `TrainingJob` to `local_path`.</span>
+
+<span class="sd">    Used by `TrainingJob.fetch` and by the CLI.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    local_path: str or pathlib.Path</span>
+<span class="sd">        Directory to write the model artifact to.</span>
+<span class="sd">    tag: str</span>
+<span class="sd">        The tag of the </span>
+<span class="sd">    remote_path: str</span>
+<span class="sd">        The root directory that the model artifact got written to.</span>
+<span class="sd">        This should be the same as the `config.output_path` of the `TrainingJob` that generated</span>
+<span class="sd">        this model artifact.</span>
+<span class="sd">    train_driver: str</span>
+<span class="sd">        The train_driver (service) that will perform the training. Cf. the `TrainJob` docstring.</span>
+<span class="sd">    extract: bool, default True</span>
+<span class="sd">        Whether or not to untar the data on arrival.</span>
+<span class="sd">    job_name: str or None</span>
+<span class="sd">        The name of the job used to generate the model artifact. If omitted, the most recent model</span>
+<span class="sd">        artifact associated with the given `tag` will be downloaded. If included, the model artifact</span>
+<span class="sd">        associated with this specific job will be downloaded.</span>
+
+<span class="sd">        This parameter is primarily intended for use by the `TrainJob.fetch` object method.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># TODO: remote_path or output_path? Standardize name.</span>
+    <span class="k">if</span> <span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;sagemaker&#39;</span><span class="p">:</span>
+        <span class="kn">import</span> <span class="nn">boto3</span>
+
+        <span class="n">path</span> <span class="o">=</span> <span class="n">validate_path</span><span class="p">(</span><span class="n">local_path</span><span class="p">)</span>
+        <span class="n">job_name</span> <span class="o">=</span> <span class="n">job_name</span> <span class="k">if</span> <span class="n">job_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">get_previous_job_name</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
+        <span class="n">output_dir</span> <span class="o">=</span> <span class="n">remote_path</span>
+        <span class="n">bucket_name</span> <span class="o">=</span> <span class="n">output_dir</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;s3://&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">bucket_path</span> <span class="o">=</span> <span class="s1">&#39;/&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;s3://&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">:])</span>
+        <span class="n">model_path</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{bucket_path}{job_name}</span><span class="s1">/output/model.tar.gz&#39;</span>
+        <span class="n">local_model_filepath</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="si">{path}</span><span class="s1">/model.tar.gz&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span>
+        <span class="n">local_model_filepath_str</span> <span class="o">=</span> <span class="n">local_model_filepath</span><span class="o">.</span><span class="n">as_posix</span><span class="p">()</span>
+        <span class="n">local_model_directory_str</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;{local_model_filepath.parent.as_posix()}/&#39;</span>
+
+        <span class="n">s3_client</span> <span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s1">&#39;s3&#39;</span><span class="p">)</span>
+        <span class="n">s3_client</span><span class="o">.</span><span class="n">download_file</span><span class="p">(</span><span class="n">bucket_name</span><span class="p">,</span> <span class="n">model_path</span><span class="p">,</span> <span class="n">local_model_filepath_str</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">extract</span><span class="p">:</span>
+            <span class="n">tarfile</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">local_model_filepath_str</span><span class="p">)</span><span class="o">.</span><span class="n">extractall</span><span class="p">()</span>
+            <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">local_model_filepath_str</span><span class="p">)</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Downloaded model artifact(s) to &quot;</span><span class="si">{local_model_directory_str}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Downloaded model artifact(s) to &quot;</span><span class="si">{local_model_filepath_str}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+
+<div class="viewcode-block" id="copy_resources"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.copy_resources">[docs]</a><span class="k">def</span> <span class="nf">copy_resources</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">dest</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">training_artifact</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Copies training file resources from `src` to `dest`.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    src: str</span>
+<span class="sd">        The source directory.</span>
+<span class="sd">    dest: str</span>
+<span class="sd">        The target directory.</span>
+<span class="sd">    overwrite: bool, default True</span>
+<span class="sd">        Whether or not to overwrite existing resources in the target directory.</span>
+<span class="sd">    training_artifact: bool, default False</span>
+<span class="sd">        Whether or not to include the training artifact in the list of files copied.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">src</span><span class="p">,</span> <span class="n">dest</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">src</span><span class="p">),</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">dest</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">src</span> <span class="o">/</span> <span class="s1">&#39;Dockerfile&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;No &quot;Dockerfile&quot; found in the source directory.&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">src</span> <span class="o">/</span> <span class="s1">&#39;run.sh&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;No &quot;run.sh&quot; entrypoint found in the source directory.&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">training_artifact</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="n">src</span> <span class="o">/</span> <span class="n">training_artifact</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="n">f</span><span class="s1">&#39;Training artifact &quot;</span><span class="si">{training_artifact}</span><span class="s1">&quot; not found in source directory.&#39;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">dest</span> <span class="o">/</span> <span class="s1">&#39;Dockerfile&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">or</span> <span class="n">overwrite</span><span class="p">:</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">src</span> <span class="o">/</span> <span class="s1">&#39;Dockerfile&#39;</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">dest</span> <span class="o">/</span> <span class="s1">&#39;Dockerfile&#39;</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">dest</span> <span class="o">/</span> <span class="s1">&#39;run.sh&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">or</span> <span class="n">overwrite</span><span class="p">:</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">src</span> <span class="o">/</span> <span class="s1">&#39;run.sh&#39;</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">dest</span> <span class="o">/</span> <span class="s1">&#39;run.sh&#39;</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">dest</span> <span class="o">/</span> <span class="n">training_artifact</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">or</span> <span class="n">overwrite</span><span class="p">:</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">src</span> <span class="o">/</span> <span class="n">training_artifact</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">dest</span> <span class="o">/</span> <span class="n">training_artifact</span><span class="p">))</span>
+    
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Copied files over to &quot;</span><span class="si">{dest}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span></div>
+
+
+<span class="k">def</span> <span class="nf">create_template</span><span class="p">(</span><span class="n">template_name</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Helper function for writing a parameterized template to disk.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">template_env</span> <span class="o">=</span> <span class="n">jinja2</span><span class="o">.</span><span class="n">Environment</span><span class="p">(</span><span class="n">loader</span><span class="o">=</span><span class="n">jinja2</span><span class="o">.</span><span class="n">PackageLoader</span><span class="p">(</span><span class="s1">&#39;fahr&#39;</span><span class="p">,</span> <span class="s1">&#39;templates&#39;</span><span class="p">))</span>
+    <span class="n">template_text</span> <span class="o">=</span> <span class="n">template_env</span><span class="o">.</span><span class="n">get_template</span><span class="p">(</span><span class="n">template_name</span><span class="p">)</span><span class="o">.</span><span class="n">render</span><span class="p">(</span>
+        <span class="o">**</span><span class="n">kwargs</span>
+    <span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">dirpath</span> <span class="o">/</span> <span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">template_text</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">create_dockerfile</span><span class="p">(</span><span class="n">build_driver</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">,</span> <span class="n">envfile</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Creates a Dockerfile compatible with the given drivers and writes to to disk.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    build_driver: str</span>
+<span class="sd">        The build_driver (service) that will build the model image.</span>
+<span class="sd">    train_driver: str</span>
+<span class="sd">        The train_driver (service) that will perform the training.</span>
+<span class="sd">    dirpath: str</span>
+<span class="sd">        Path to the directory being bundled.</span>
+<span class="sd">    filepath: str</span>
+<span class="sd">        Name of the model training artifact being bundled.</span>
+<span class="sd">    envfile: str</span>
+<span class="sd">        Path to the environment file that will be built in the image.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;sagemaker&#39;</span><span class="p">:</span>
+        <span class="n">create_template</span><span class="p">(</span>
+            <span class="s1">&#39;sagemaker/Dockerfile.template&#39;</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="s1">&#39;Dockerfile&#39;</span><span class="p">,</span> 
+            <span class="n">filepath</span><span class="o">=</span><span class="n">filepath</span><span class="p">,</span> <span class="n">envfile</span><span class="o">=</span><span class="n">envfile</span><span class="p">,</span> <span class="n">build_driver</span><span class="o">=</span><span class="n">build_driver</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+
+<span class="k">def</span> <span class="nf">create_runfile</span><span class="p">(</span><span class="n">build_driver</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Creates a run.sh entrypoint for the Docker image compatible with the given `train_driver`,</span>
+<span class="sd">    and writes it to disk.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    build_driver: str</span>
+<span class="sd">        The build_driver (service) that will build the model image.</span>
+<span class="sd">    train_driver: str</span>
+<span class="sd">        The train_driver (service) that will perform the training.</span>
+<span class="sd">    dirpath: str</span>
+<span class="sd">        Path to the directory being bundled.</span>
+<span class="sd">    filepath: str</span>
+<span class="sd">        Name of the model training artifact being bundled.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;sagemaker&#39;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">filepath</span><span class="o">.</span><span class="n">suffix</span> <span class="o">==</span> <span class="s1">&#39;.ipynb&#39;</span><span class="p">:</span>
+            <span class="n">run_cmd</span> <span class="o">=</span>\
+                <span class="p">(</span><span class="n">f</span><span class="s2">&quot;jupyter nbconvert --execute --ExecutePreprocessor.timeout=-1 &quot;</span>
+                 <span class="n">f</span><span class="s2">&quot;--to notebook --inplace </span><span class="si">{filepath.name}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">create_template</span><span class="p">(</span><span class="s1">&#39;sagemaker/run.template&#39;</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="s1">&#39;run.sh&#39;</span><span class="p">,</span> <span class="n">run_cmd</span><span class="o">=</span><span class="n">run_cmd</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">filepath</span><span class="o">.</span><span class="n">suffix</span> <span class="o">==</span> <span class="s1">&#39;.py&#39;</span><span class="p">:</span>
+            <span class="n">run_cmd</span> <span class="o">=</span>\
+                <span class="n">f</span><span class="s2">&quot;python </span><span class="si">{filepath.name}</span><span class="s2">&quot;</span>
+            <span class="n">create_template</span><span class="p">(</span><span class="s1">&#39;sagemaker/run.template&#39;</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="s1">&#39;run.sh&#39;</span><span class="p">,</span> <span class="n">run_cmd</span><span class="o">=</span><span class="n">run_cmd</span><span class="p">)</span>                
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+
+<span class="k">def</span> <span class="nf">create_resources</span><span class="p">(</span><span class="n">build_driver</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">,</span> <span class="n">envfile</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Creates file resources that will be used by this library in a target directory </span>
+<span class="sd">    (specifically, a Dockerfile and a run.sh entrypoint). Calls `create_runfile` and</span>
+<span class="sd">    `create_dockerfile` as a subroutine.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    build_driver: str</span>
+<span class="sd">        The build_driver (service) that will build the model image.</span>
+<span class="sd">    train_driver: str</span>
+<span class="sd">        The train_driver (service) that will perform the training.</span>
+<span class="sd">    dirpath: str</span>
+<span class="sd">        Path to the directory being bundled.</span>
+<span class="sd">    filepath: str</span>
+<span class="sd">        Name of the model training artifact being bundled.</span>
+<span class="sd">    envfile: str</span>
+<span class="sd">        Path to the environment file that will be built in the image.</span>
+<span class="sd">    overwrite: bool</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dockerfile, runfile: tuple</span>
+<span class="sd">        The filepaths written to.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">dockerfile</span> <span class="o">=</span> <span class="n">dirpath</span> <span class="o">/</span> <span class="s1">&#39;Dockerfile&#39;</span>
+    <span class="n">dockerfile_exists</span> <span class="o">=</span> <span class="n">dockerfile</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">dockerfile_exists</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">overwrite</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="n">f</span><span class="s1">&#39;A Dockerfile already exists at &quot;</span><span class="si">{dockerfile}</span><span class="s1">&quot; and &quot;overwrite&quot; is set to False. &#39;</span>
+            <span class="n">f</span><span class="s1">&#39;The existing Dockerfile will be reused.&#39;</span>
+        <span class="p">)</span>
+    <span class="k">elif</span> <span class="n">dockerfile_exists</span> <span class="ow">and</span> <span class="n">overwrite</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="n">f</span><span class="s1">&#39;A Dockerfile already exists at &quot;</span><span class="si">{dockerfile}</span><span class="s1">&quot; and &quot;overwrite&quot; is set to True. &#39;</span>
+            <span class="n">f</span><span class="s1">&#39;Overwriting the file that is currently there.&#39;</span>
+        <span class="p">)</span>
+        <span class="n">create_dockerfile</span><span class="p">(</span><span class="n">build_driver</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">envfile</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>  <span class="c1"># dockerfile_exists</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Creating new Dockerfile at &quot;</span><span class="si">{dockerfile}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
+        <span class="n">create_dockerfile</span><span class="p">(</span><span class="n">build_driver</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">envfile</span><span class="p">)</span>
+
+    <span class="n">runfile</span> <span class="o">=</span> <span class="n">dirpath</span> <span class="o">/</span> <span class="s1">&#39;run.sh&#39;</span>
+    <span class="n">runfile_exists</span> <span class="o">=</span> <span class="n">runfile</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">runfile_exists</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">overwrite</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="n">f</span><span class="s1">&#39;An image entrypoint already exists at &quot;</span><span class="si">{runfile}</span><span class="s1">&quot; and &quot;overwrite&quot; is set to False. &#39;</span>
+            <span class="n">f</span><span class="s1">&#39;The existing file will be reused.&#39;</span>
+        <span class="p">)</span>
+    <span class="k">elif</span> <span class="n">runfile_exists</span> <span class="ow">and</span> <span class="n">overwrite</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="n">f</span><span class="s1">&#39;An image entrypoint already exists at &quot;</span><span class="si">{runfile}</span><span class="s1">&quot; and &quot;overwrite&quot; is set to True. &#39;</span>
+            <span class="n">f</span><span class="s1">&#39;Overwriting the file that is currently there.&#39;</span>
+        <span class="p">)</span>
+        <span class="n">create_runfile</span><span class="p">(</span><span class="n">build_driver</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>  <span class="c1"># runfile_exists</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Creating new image entrypoint at &quot;</span><span class="si">{runfile}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
+        <span class="n">create_runfile</span><span class="p">(</span><span class="n">build_driver</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">)</span>  
+
+    <span class="k">return</span> <span class="n">dockerfile</span><span class="p">,</span> <span class="n">runfile</span>
+
+
+<span class="k">def</span> <span class="nf">get_repository_info</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span> <span class="n">sts_client</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Identify the ECR repository for a given tag. SageMaker only.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">sts_client</span> <span class="o">=</span> <span class="n">sts_client</span> <span class="k">if</span> <span class="n">sts_client</span> <span class="k">else</span> <span class="n">session</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s1">&#39;sts&#39;</span><span class="p">)</span>
+    <span class="n">account_id</span> <span class="o">=</span> <span class="n">sts_client</span><span class="o">.</span><span class="n">get_caller_identity</span><span class="p">()[</span><span class="s1">&#39;Account&#39;</span><span class="p">]</span>
+    <span class="n">region</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">region_name</span>
+
+    <span class="n">repository</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{account_id}</span><span class="s1">.dkr.ecr.</span><span class="si">{region}</span><span class="s1">.amazonaws.com/</span><span class="si">{tag}</span><span class="s1">&#39;</span>
+    <span class="k">return</span> <span class="n">region</span><span class="p">,</span> <span class="n">account_id</span><span class="p">,</span> <span class="n">repository</span>
+
+
+<span class="k">def</span> <span class="nf">get_previous_job_name</span><span class="p">(</span><span class="n">tag</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Given the training run tag, determine the name of the job immediately previous to this</span>
+<span class="sd">    one, assuming one exists. SageMaker only.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">boto3</span>
+    
+    <span class="c1"># FIXME: support paginated requests, as otherwise most recent run can fall of the list</span>
+    <span class="n">sagemaker_client</span> <span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s1">&#39;sagemaker&#39;</span><span class="p">)</span>
+    <span class="n">finished_jobs</span> <span class="o">=</span> <span class="n">sagemaker_client</span><span class="o">.</span><span class="n">list_training_jobs</span><span class="p">()[</span><span class="s1">&#39;TrainingJobSummaries&#39;</span><span class="p">]</span>
+    <span class="n">prefix</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;fahr-{tag.replace(&quot;/&quot;, &quot;-&quot;).replace(&quot;_&quot;, &quot;-&quot;)}&#39;</span>
+    <span class="n">previous_jobs</span> <span class="o">=</span> <span class="p">[</span><span class="n">j</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">finished_jobs</span> <span class="k">if</span> <span class="n">j</span><span class="p">[</span><span class="s1">&#39;TrainingJobName&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">prefix</span><span class="p">)]</span>
+    <span class="k">return</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{prefix}</span><span class="s1">-{len(previous_jobs)}&#39;</span> <span class="k">if</span> <span class="n">previous_jobs</span> <span class="k">else</span> <span class="kc">None</span>
+
+
+<span class="k">def</span> <span class="nf">get_next_job_name</span><span class="p">(</span><span class="n">tag</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Given the training run tag, determine the appropriate name for the next job run.</span>
+<span class="sd">    SageMaker only.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">previous_job_name</span> <span class="o">=</span> <span class="n">get_previous_job_name</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">previous_job_name</span><span class="p">:</span>
+        <span class="n">previous_job_num</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">previous_job_name</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">next_job_num</span> <span class="o">=</span> <span class="n">previous_job_num</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{previous_job_name[:-1]}</span><span class="s1">{str(next_job_num)}&#39;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{tag}</span><span class="s1">-1&#39;</span>
+
+
+<span class="k">def</span> <span class="nf">validate_path</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Checks that a path exists and is a directory.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Output parameter must point to an existing directory.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Output path must be a directory.&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">path</span>
+
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;TrainJob&#39;</span><span class="p">,</span> <span class="s1">&#39;fetch&#39;</span><span class="p">,</span> <span class="s1">&#39;copy_resources&#39;</span><span class="p">]</span>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, Aleksey Bilogur
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

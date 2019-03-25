@@ -1,0 +1,285 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>fahr.cli &mdash; fahr 0.0.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> fahr
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+    
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Sections</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../fahr.html">fahr package</a></li>
+</ul>
+
+            
+          
+    <a href="quickstart.html">Quickstart</a>
+    <a href="fahr.html">API Reference</a>
+  
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">fahr</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>fahr.cli</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for fahr.cli</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">click</span>
+<span class="kn">from</span> <span class="nn">.fahr</span> <span class="k">import</span> <span class="n">TrainJob</span>
+<span class="kn">from</span> <span class="nn">.fahr</span> <span class="k">import</span> <span class="n">fetch</span> <span class="k">as</span> <span class="n">_fetch</span>
+<span class="kn">from</span> <span class="nn">.fahr</span> <span class="k">import</span> <span class="n">copy_resources</span>
+
+<span class="nd">@click</span><span class="o">.</span><span class="n">group</span><span class="p">()</span>
+<span class="k">def</span> <span class="nf">cli</span><span class="p">():</span>
+    <span class="k">pass</span>
+
+
+<div class="viewcode-block" id="fit_wrapper"><a class="viewcode-back" href="../../fahr.html#fahr.cli.fit_wrapper">[docs]</a><span class="k">def</span> <span class="nf">fit_wrapper</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+    <span class="nd">@click</span><span class="o">.</span><span class="n">command</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">func</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="n">context_settings</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">ignore_unknown_options</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">allow_extra_args</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span><span class="s1">&#39;training_artifact_path&#39;</span><span class="p">)</span>
+    <span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span><span class="s1">&#39;--train-driver&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;sagemaker&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Driver to be used for running the train job.&#39;</span><span class="p">)</span>
+    <span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span><span class="s1">&#39;--build-driver&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;local&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Driver to be used for building the model image.&#39;</span><span class="p">)</span>
+    <span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span><span class="s1">&#39;--envfile&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Code environment definition file to build with.&#39;</span><span class="p">)</span>
+    <span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span><span class="s1">&#39;--overwrite&#39;</span><span class="p">,</span> <span class="n">is_flag</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;If true, overwrite existing training artifacts.&#39;</span><span class="p">)</span>
+    <span class="nd">@click</span><span class="o">.</span><span class="n">pass_context</span>
+    <span class="k">def</span> <span class="nf">new_func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    
+    <span class="k">return</span> <span class="n">new_func</span></div>
+
+
+<div class="viewcode-block" id="fmt_ctx"><a class="viewcode-back" href="../../fahr.html#fahr.cli.fmt_ctx">[docs]</a><span class="k">def</span> <span class="nf">fmt_ctx</span><span class="p">(</span><span class="n">ctx</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">fmt_ctx_arg</span><span class="p">(</span><span class="n">arg</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">arg</span><span class="p">[:</span><span class="mi">9</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;--config.&#39;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="n">f</span><span class="s1">&#39;Invalid input argument &quot;</span><span class="si">{arg}</span><span class="s1">&quot;; &#39;</span>
+                <span class="n">f</span><span class="s1">&#39;if this is a configuration argument it must be prefixed with &quot;config&quot;.&#39;</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">arg</span><span class="p">[</span><span class="mi">9</span><span class="p">:]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;=&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="nb">dict</span><span class="p">([</span><span class="n">fmt_ctx_arg</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">ctx</span><span class="o">.</span><span class="n">args</span><span class="p">])</span></div>
+
+
+<span class="nd">@fit_wrapper</span>
+<span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">training_artifact_path</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">build_driver</span><span class="p">,</span> <span class="n">envfile</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">):</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">fmt_ctx</span><span class="p">(</span><span class="n">ctx</span><span class="p">)</span>
+    <span class="n">j</span> <span class="o">=</span> <span class="n">TrainJob</span><span class="p">(</span>
+        <span class="n">training_artifact_path</span><span class="p">,</span> <span class="n">build_driver</span><span class="o">=</span><span class="n">build_driver</span><span class="p">,</span> <span class="n">train_driver</span><span class="o">=</span><span class="n">train_driver</span><span class="p">,</span>
+        <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">config</span>
+    <span class="p">)</span>
+    <span class="n">j</span><span class="o">.</span><span class="n">fit</span><span class="p">()</span>
+
+
+<span class="nd">@fit_wrapper</span>
+<span class="k">def</span> <span class="nf">init</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">training_artifact_path</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">build_driver</span><span class="p">,</span> <span class="n">envfile</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">):</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">fmt_ctx</span><span class="p">(</span><span class="n">ctx</span><span class="p">)</span>
+    <span class="n">TrainJob</span><span class="p">(</span>
+        <span class="n">training_artifact_path</span><span class="p">,</span> <span class="n">build_driver</span><span class="o">=</span><span class="n">build_driver</span><span class="p">,</span> <span class="n">train_driver</span><span class="o">=</span><span class="n">train_driver</span><span class="p">,</span>
+        <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">config</span>
+    <span class="p">)</span>
+
+
+<span class="nd">@click</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;fetch&#39;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span><span class="s1">&#39;local_path&#39;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span><span class="s1">&#39;tag&#39;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span><span class="s1">&#39;remote_path&#39;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span><span class="s1">&#39;--driver&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;sagemaker&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Driver to be used for running the train job.&#39;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span><span class="s1">&#39;--no-extract&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">is_flag</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Don</span><span class="se">\&#39;</span><span class="s1">t extract the data on arrival.&#39;</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">fetch</span><span class="p">(</span><span class="n">local_path</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span> <span class="n">remote_path</span><span class="p">,</span> <span class="n">driver</span><span class="p">,</span> <span class="n">no_extract</span><span class="p">):</span>
+    <span class="n">_fetch</span><span class="p">(</span><span class="n">local_path</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span> <span class="n">remote_path</span><span class="p">,</span> <span class="n">train_driver</span><span class="o">=</span><span class="n">driver</span><span class="p">,</span> <span class="n">extract</span><span class="o">=</span><span class="ow">not</span> <span class="n">no_extract</span><span class="p">)</span>
+
+
+<span class="nd">@click</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;copy&#39;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span><span class="s1">&#39;src&#39;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span><span class="s1">&#39;dest&#39;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span><span class="s1">&#39;--overwrite&#39;</span><span class="p">,</span> <span class="n">is_flag</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s1">&#39;If true, overwrite existing job files.&#39;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span><span class="s1">&#39;--include-training-artifact&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s1">&#39;If set, the training artifact to copy.&#39;</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">copy</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">dest</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">,</span> <span class="n">include_training_artifact</span><span class="p">):</span>
+    <span class="n">include_training_artifact</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">include_training_artifact</span> <span class="o">==</span> <span class="s1">&#39;None&#39;</span> \
+        <span class="k">else</span> <span class="n">include_training_artifact</span>
+    <span class="n">copy_resources</span><span class="p">(</span>
+        <span class="n">src</span><span class="p">,</span> <span class="n">dest</span><span class="p">,</span> 
+        <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">,</span> 
+        <span class="n">training_artifact</span><span class="o">=</span><span class="n">include_training_artifact</span>
+    <span class="p">)</span>
+
+
+<span class="n">cli</span><span class="o">.</span><span class="n">add_command</span><span class="p">(</span><span class="n">fit</span><span class="p">)</span>
+<span class="n">cli</span><span class="o">.</span><span class="n">add_command</span><span class="p">(</span><span class="n">fetch</span><span class="p">)</span>
+<span class="n">cli</span><span class="o">.</span><span class="n">add_command</span><span class="p">(</span><span class="n">init</span><span class="p">)</span>
+<span class="n">cli</span><span class="o">.</span><span class="n">add_command</span><span class="p">(</span><span class="n">copy</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, Aleksey Bilogur
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
