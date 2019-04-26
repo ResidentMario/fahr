@@ -91,9 +91,8 @@ class TrainJob:
                 raise ValueError('The Kaggle driver requires a username.')
 
             # Ensure that the job name is always a valid kernel name
-            # TODO: we require 5+ alphabetical for now, but should relax this restriction
             filename = f'{filepath.stem}'.replace("/", "-").replace("_", "-")
-            regex = '^[a-zA-Z]{5,}'
+            regex = '^[a-zA-Z0-9]{5,}'
             try:
                 re.match(regex, filename).span()[1] == len(filename)
             except (AssertionError, AttributeError):
