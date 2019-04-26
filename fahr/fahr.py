@@ -6,6 +6,9 @@ import re
 import logging
 import sys
 import shutil
+import json
+import ast
+import subprocess
 
 import docker
 import jinja2
@@ -18,7 +21,6 @@ if not logger.handlers:
     handler.setLevel(logging.INFO)
     handler.setFormatter(logging.Formatter('%(name)s - %(levelname)s - %(message)s'))
     logger.addHandler(handler)
-
 
 class TrainJob:
     def __init__(
@@ -39,12 +41,15 @@ class TrainJob:
             * 'local' -- Builds the model container on your local machine w/o GPU.
             * 'local-gpu' -- Builds the model container on your local machine w/ GPU.
         
+            Note that if you are using the Kaggle training driver, no build driver needs to be 
+            specified.
         train_driver: str
             The driver (service) that will perform the training. Currently the options are:
 
             * 'sagemaker' -- Launches a model training job on Amazon using AWS SageMaker.
+            * 'kaggle' -- Launches a model training job on Kaggle using Kaggle Kernels.
 
-            Future options include 'kaggle' and 'ml-engine'.
+            Future options include 'ml-engine'.
         envfile: str
             Optional path to the file that defines the environment that will be built in the image.
             Must be a "requirements.txt" file (which will be parsed with `pip`). If left unspecified
@@ -65,8 +70,6 @@ class TrainJob:
             raise NotImplementedError(
                 'Currently only Jupyter notebooks and Python scripts are supported.'
             )
-        if train_driver != 'sagemaker':
-            raise NotImplementedError('Currently only AWS SageMaker is supported.')
         if build_driver != 'local' and build_driver != 'local-gpu':
             raise NotImplementedError('Currently only local Docker builds are supported.')
 
@@ -78,53 +81,140 @@ class TrainJob:
             # Ensure that the job name is always a valid ARN name
             tag = f'{dirpath.stem}/{filepath.stem}'.replace("/", "-").replace("_", "-")
             regex = '^[a-zA-Z0-9](-*[a-zA-Z0-9])*'
-            match = re.match(regex, tag).span()[1] == len(tag)
-            if not match:
-                raise ValueError(f'"File name must satisfy regex {regex}"')
+            try:
+                assert re.match(regex, tag).span()[1] == len(tag)
+            except (AssertionError, AttributeError):
+                raise ValueError(f'"File name must satisfy regex "{regex}".')
 
-        # TODO: experiment with using repo2docker for image config and build
-        if envfile:
-            envfile = pathlib.Path(envfile)
-            if envfile.name != 'requirements.txt':
-                raise ValueError(
-                    '"envfile" must point to "requirements.txt" file'
-                )
+        elif train_driver == 'kaggle':
+            if config is None or 'username' not in config:
+                raise ValueError('The Kaggle driver requires a username.')
+
+            # Ensure that the job name is always a valid kernel name
+            # TODO: we require 5+ alphabetical for now, but should relax this restriction
+            filename = f'{filepath.stem}'.replace("/", "-").replace("_", "-")
+            regex = '^[a-zA-Z]{5,}'
+            try:
+                re.match(regex, filename).span()[1] == len(filename)
+            except (AssertionError, AttributeError):
+                raise ValueError(f'"File name must satisfy regex "{regex}".')
+
+            tag = f'{config["username"]}/{filename}'
+
+            # Ensure that the input sources are valid.
+            for source_param in ['dataset_sources', 'kernel_sources', 'competition_sources']:
+                if source_param in config:
+                    source_val = config[source_param]
+                    try:
+                        parsed_source_val = ast.literal_eval(source_val)
+                        assert isinstance(parsed_source_val, list)
+                        config[source_param] = parsed_source_val
+                    except (ValueError, AssertionError):
+                        raise ValueError(
+                            f'Invalid input for "{source_param}": "{config[source_param]}" '
+                            f'is not a list.'
+                        )
+
+            # Ensure that the input source actually exist.
+            import pdb; pdb.set_trace()
+            for dataset in config.get('dataset_sources', []):
+                if subprocess.run(
+                    ["kaggle", "datasets", "status", dataset],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT
+                ).returncode != 0:
+                    raise ValueError(
+                        f'Invalid input: the dataset "{dataset}" does not exist.'
+                    )
+            for kernel in config.get('kernel_sources', []):
+                if subprocess.run(
+                    ["kaggle", "kernels", "status", kernel],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT
+                ).returncode != 0:
+                    raise ValueError(
+                        f'Invalid input: the kernel "{dataset}" does not exist.'
+                    )
+
+            if 'competition_sources' in config:
+                current_competitions = str(subprocess.check_output(
+                    ["kaggle", "competitions", "list"],
+                    stderr=subprocess.STDOUT
+                ))
+                for competition in config.get('competition_sources'):
+                    if competition not in current_competitions:
+                        raise ValueError(
+                            f'Invalid input: the competition "{competition}" does not exist '
+                            f'or is not currently running.'
+                        )
+
         else:
-            pip_reqfile = dirpath / 'requirements.txt'
-            pip_reqfile_exists = pip_reqfile.exists()
-            if not pip_reqfile_exists:
-                raise ValueError('No requirements.txt present and no "envfile" specified.')
+            raise NotImplementedError(
+                'Currently only AWS SageMaker and Kaggle Kernels are supported.'
+            )
+
+        if train_driver != 'kaggle':
+            if envfile:
+                envfile = pathlib.Path(envfile)
+                if envfile.name != 'requirements.txt':
+                    raise ValueError(
+                        '"envfile" must point to "requirements.txt" file'
+                    )
             else:
-                envfile = pip_reqfile
+                pip_reqfile = dirpath / 'requirements.txt'
+                pip_reqfile_exists = pip_reqfile.exists()
+                if not pip_reqfile_exists:
+                    raise ValueError('No requirements.txt present and no "envfile" specified.')
+                else:
+                    envfile = pip_reqfile
 
-        logger.info(f'Using "{envfile}" as envfile.')
+            logger.info(f'Using "{envfile}" as envfile.')
 
-        envfile = envfile.absolute().relative_to(pathlib.Path.cwd()).as_posix()
-        dockerfile, runfile = create_resources(
-            build_driver, train_driver, dirpath, filepath, envfile, overwrite
-        )
+            envfile = envfile.absolute().relative_to(pathlib.Path.cwd()).as_posix()
+            dockerfile, runfile = create_resources(
+                build_driver, train_driver, dirpath, filepath, envfile, overwrite
+            )
+        else:  # train_driver == 'kaggle':
+            # Kaggle kernels run in a default environment. The web UI allows you to 
+            # specify custom packages but the API does not currently support this feature.
+            if envfile:
+                raise ValueError(
+                    'The "envfile" parameter is specified but shouldn\'t be.'
+                    'Kaggle does not currently support running code in custom containers'
+                    'in the API.'
+                )
+            create_kaggle_resources(
+                dirpath, filepath, tag,
+                title=config.pop('title', filename.replace('_', ' ').replace('-', ' ').title()),
+                is_private=config.pop('is_private', False),
+                enable_gpu=config.pop('enable_gpu', False),
+                enable_internet=config.pop('enable_internet', False),
+                dataset_sources=config.pop('dataset_sources', []),
+                kernel_sources=config.pop('kernel_sources', []),
+                competition_sources=config.pop('competition_sources', []),
+            )
 
         self.dirpath = dirpath
         self.filepath = filepath
-        self.dockerfile = dockerfile
-        self.runfile = runfile
         self.build_driver = build_driver
         self.train_driver = train_driver
         self.config = config
-
-        self.docker_client = docker.client.from_env()
         self.tag = tag
+
+        if train_driver != 'kaggle':
+            self.dockerfile = dockerfile
+            self.runfile = runfile
+            self.docker_client = docker.client.from_env()
 
     def build(self):
         """
         Builds the model training image locally.
         """
-        if self.build_driver == 'local' or self.build_driver == 'local-gpu':
-            path = self.dirpath.as_posix()
-            logger.info(f'Building "{self.tag}" container image from "{path}".')
-            self.docker_client.images.build(path=path, tag=self.tag, rm=True)
-        else:
-            raise NotImplementedError
+        if self.train_driver != 'kaggle':
+            if self.build_driver == 'local' or self.build_driver == 'local-gpu':
+                path = self.dirpath.as_posix()
+                logger.info(f'Building "{self.tag}" container image from "{path}".')
+                self.docker_client.images.build(path=path, tag=self.tag, rm=True)
+            else:
+                raise NotImplementedError
 
     def push(self):
         """
@@ -175,6 +265,9 @@ class TrainJob:
             # TODO: does reusing the client actually save a network request?
             self.sts_client = sts_client
 
+        elif self.train_driver == 'kaggle':
+            return
+
         else:
             raise NotImplementedError
 
@@ -183,6 +276,7 @@ class TrainJob:
         Launches a remote training job. Where the job is launched depends on the `train_driver`:
 
         * sagemaker -- The job is run on an EC2 machine via the AWS SageMaker API.
+        * kaggle -- The job is run in a Kaggle Kernel via the Kaggle API.
         """
         if self.train_driver == 'sagemaker':
             import boto3
@@ -250,7 +344,7 @@ class TrainJob:
 
             self.job_name = get_next_job_name(self.tag)
             logger.info(
-                f'Fitting {self.tag} classifier with job name {self.job_name}. '
+                f'Fitting {self.tag} training job with job name {self.job_name}. '
                 f'Using {train_instance_count}x {train_instance_type} compute instances.'
             )
             clf.fit(job_name=self.job_name, wait=False)
@@ -263,15 +357,33 @@ class TrainJob:
                 f'home?#logStream:group=/aws/sagemaker/TrainingJobs;'
                 f'streamFilter=typeLogStreamPrefix'
             )
-            download_cmd = (
-                f'fahr fetch ./ "{self.tag}" "{output_path}"'
-            )
+            download_cmd = f'fahr fetch --driver="sagemaker" ./ "{self.tag}" "{output_path}"'
             logger.info(
                 f'The training job is now running. '
                 f'To track training progress visit {landing_page}. '
                 f'To see training logs visit {logs_page}. '
-                f'To download finished model artifacts run {download_cmd} (or similar) after training is complete.'
+                f'To download finished model artifacts run {download_cmd} after '
+                f'training is complete.'
             )
+
+        elif self.train_driver == 'kaggle':
+            logger.info(
+                # TODO: get and display the number of the run, e.g. version 3, 4, etc.
+                f'Fitting {self.tag} training job.'
+            )
+            subprocess.run(
+                ["kaggle", "kernels", "push", "-p", self.dirpath.as_posix()],
+                stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT
+            )
+            download_cmd = f'fahr fetch --driver="kaggle" ./ "{self.tag}"'
+            landing_page = f'https://www.kaggle.com/{self.tag}'
+            logger.info(
+                f'The training job is now running. '
+                f'To track training progress visit {landing_page}. '
+                f'To download finished model artifacts run {download_cmd} after '
+                f'training is complete.'
+            )
+
         else:
             raise NotImplementedError
 
@@ -314,24 +426,6 @@ class TrainJob:
         self.build()
         self.push()
         self.train()
-
-
-    # TODO: remote this method entirely in favor of fit-fetch?
-    def run(self, path):
-        """
-        Executes a model training job from start to finish, generating a model training artifact 
-        in a local repository.
-
-        Parameters
-        ----------
-        path: str or pathlib.Path
-            Directory to write the model artifact to.
-        """
-        path = validate_path(path)
-        self.build()
-        self.push()
-        self.train()
-        self.fetch(path)
 
 
 def fetch(local_path, tag, remote_path, train_driver='sagemaker', extract=False, job_name=None):
@@ -384,6 +478,14 @@ def fetch(local_path, tag, remote_path, train_driver='sagemaker', extract=False,
             logger.info(f'Downloaded model artifact(s) to "{local_model_directory_str}".')
         else:
             logger.info(f'Downloaded model artifact(s) to "{local_model_filepath_str}".')
+
+    elif train_driver == 'kaggle':
+        path = validate_path(local_path)
+        subprocess.run(
+            ["kaggle", "kernels", "output", tag, "-p", local_path],
+            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT
+        )
+        logger.info(f'Downloaded model artifact(s) to "{local_path}".')
 
     else:
         raise NotImplementedError
@@ -506,6 +608,8 @@ def create_resources(build_driver, train_driver, dirpath, filepath, envfile, ove
     (specifically, a Dockerfile and a run.sh entrypoint). Calls `create_runfile` and
     `create_dockerfile` as a subroutine.
 
+    See also: create_kaggle_resources.
+
     Parameters
     ----------
     build_driver: str
@@ -560,6 +664,48 @@ def create_resources(build_driver, train_driver, dirpath, filepath, envfile, ove
         create_runfile(build_driver, train_driver, dirpath, filepath)  
 
     return dockerfile, runfile
+
+
+def create_kaggle_resources(
+        dirpath, filepath, tag, title, is_private, enable_gpu, enable_internet,
+        dataset_sources, kernel_sources, competition_sources
+    ):
+    """
+    Create resources necessary for a Kaggle Kernels run, specifically, a 'kernel-metadata.json'
+    file.
+    
+    See also: create_resources.
+
+    Parameters
+    ----------
+    dirpath: str
+        Path to the directory containing the training artifact.
+    filepath: str
+        Path to the training artifact.
+    tag: str
+        The 'username/kernel_slug' pair that uniquely identifies this kernel.
+
+    Returns
+    -------
+    None
+    """
+    kernel_metadata = {
+        'id': f'{tag}',
+        'title': title,
+        'code_file': filepath.as_posix(),
+        'language': 'python',
+        'kernel_type': 'notebook' if filepath.suffix == '.ipynb' else 'script',
+        'is_private': is_private,
+        'enable_gpu': enable_gpu,
+        'enable_internet': enable_internet,
+        'dataset_sources': dataset_sources,
+        'competition_sources': competition_sources,
+        'kernel_sources': kernel_sources
+    }
+    kernel_metadata_filepath = (dirpath / 'kernel-metadata.json').as_posix()
+    logger.info(f'Writing kernel metadata to "{kernel_metadata_filepath}".')
+    with open(kernel_metadata_filepath, 'w') as fp:
+        json.dump(kernel_metadata, fp)
 
 
 def get_repository_info(session, tag, sts_client=None):

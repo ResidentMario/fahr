@@ -61,7 +61,7 @@ def init(ctx, training_artifact_path, train_driver, build_driver, envfile, overw
 @click.command(name='fetch')
 @click.argument('local_path')
 @click.argument('tag')
-@click.argument('remote_path')
+@click.argument('remote_path', required=False)
 @click.option('--driver', default='sagemaker', help='Driver to be used for running the train job.')
 @click.option('--no-extract', default=False, is_flag=True,
     help='Don\'t extract the data on arrival.')
