@@ -35,6 +35,7 @@
   <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="fahr package" href="../fahr.html" />
     <link rel="prev" title="Kaggle" href="kaggle.html" /> 
 </head>
 
@@ -80,18 +81,22 @@
             
             
               <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../fahr.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide.html">User Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="kaggle.html">Kaggle Driver</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">SageMaker Driver</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#specs">Specs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#how-it-works">How it works</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#basic-usage">Basic usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#limitations">Limitations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#advanced-configuration">Advanced configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tips-and-tricks">Tips and tricks</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="../fahr.html">API Reference</a></li>
 </ul>
 
             
@@ -160,27 +165,72 @@
 <h1>SageMaker<a class="headerlink" href="#sagemaker" title="Permalink to this headline">¶</a></h1>
 <div class="section" id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
-<p><a class="reference external" href="https://aws.amazon.com/sagemaker/">AWS SageMaker</a> is Amazon AWS’s fully managed machine learning infrastructure as a service offering. It bundles a hodgepodge of ML features including model training, hyperparameter search, model deployment, data labelling, and hosted Jupyter notebooks. However model training and hosted Jupyter notebooks are its most salient features.</p>
+<p><a class="reference external" href="https://aws.amazon.com/sagemaker/">AWS SageMaker</a> is Amazon AWS’s fully managed machine learning infrastructure as a service offering. It bundles a hodgepodge of ML features, the most salient of which are its model training API and its hosted Jupyter notebooks interface.</p>
 <p>Training a model via SageMaker requires also interacting with Amazon S3, which it uses for artifact storage, and Amazon ECR, which it uses for Docker image storage.</p>
 </div>
 <div class="section" id="specs">
 <h2>Specs<a class="headerlink" href="#specs" title="Permalink to this headline">¶</a></h2>
 <p>SageMaker can run training jobs on a broad variety of instances types and sizes, which vary widely in capabilities and cost. The full list is available in the <a class="reference external" href="https://aws.amazon.com/sagemaker/pricing/">SageMaker pricing guide</a>. Multi-machine (distributed) training is also possible.</p>
+<p>By default training will be performed on a <code class="docutils literal notranslate"><span class="pre">ml.c4.2xlarge</span></code> instance, which provides 8 cores, 15 GB of RAM, and no GPU on a 2.9 GHz Intel Xeon. At time of writing this costs $0.557/hour. To learn how to specify alternative runtime environments see the instructions under “Advanced configuration”.</p>
+</div>
+<div class="section" id="how-it-works">
+<h2>How it works<a class="headerlink" href="#how-it-works" title="Permalink to this headline">¶</a></h2>
+<p>SageMaker has a native API for running training jobs that is based on a vendor-specific JSON configuration schema. There’s also an “advanced usage” escape hatch that lets you run arbitrary Docker images that you define via SageMaker, and this is the feature that <code class="docutils literal notranslate"><span class="pre">fahr</span></code> uses for training - JSON schemas are brittle, opaque, and inherently not possible to run locally.</p>
+<p>You first build a Docker image defining your model environment locally, which gets uploaded to Amazon’s container registry service, AWS ECR. When you initialize a training job you provide a reference to the Docker image you’ve built and an output path to S3. SageMaker pulls this Docker image into an EC2 instance of your chosing configured with the SageMaker AMI, then runs the image. After execution terminates, it picks up any outputs written to the <code class="docutils literal notranslate"><span class="pre">opt/ml/</span></code> folder, tars them, and uploads the tarfile to S3.</p>
+<p>To download your model artifact, pull the file written to S3 and untar it.</p>
 </div>
 <div class="section" id="prerequisites">
 <h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this headline">¶</a></h2>
 <p>You will need to have an account in AWS (which also means having a credit card on file).</p>
+<p>You will need to have Docker installed and running. If your model requires a GPU, you must furthermore have an Nvidia GPU and the <a class="reference external" href="https://github.com/NVIDIA/nvidia-docker">nvidia docker</a> toolchain installed, and it must also use a container definition that has this toolchain installed. An easy way to get this environment is to build your image inside of a <a class="reference external" href="https://docs.aws.amazon.com/sagemaker/latest/dg/nbi.html">SageMaker notebook</a>.</p>
 <p>Your training artifact must write model artifact(s) to the <code class="docutils literal notranslate"><span class="pre">/opt/ml/model</span></code> folder at the end of its execution. SageMaker bundles files in this folder and uploads them to S3 at the end of its execution.</p>
-<p>Your current IAM user must have permission to get and assume an execution role. That role must have the following permissions: SageMaker full access, ECR read-write access, S3 read-write access, EC2 run access.</p>
+<p>Your current IAM user must have permission to get and assume an execution role. That role must have the following permissions: SageMaker full access, ECR read-write access, S3 read-write access, EC2 run access. If you do not have such a role you will need to create one.</p>
 <p>The S3 output path parameter must point to an S3 path that your current IAM user has read access to.</p>
 </div>
 <div class="section" id="basic-usage">
 <h2>Basic usage<a class="headerlink" href="#basic-usage" title="Permalink to this headline">¶</a></h2>
-<p>TODO</p>
+<p>To run a training job on AWS SageMaker:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ fahr fit <span class="nv">$MODEL_ARTIFACT_FILEPATH</span> <span class="se">\</span>
+    --train-driver<span class="o">=</span><span class="s1">&#39;sagemaker&#39;</span> <span class="se">\</span>
+    --config.output_path<span class="o">=</span><span class="nv">$S3_ARTIFACT_DIRECTORY</span> <span class="se">\</span>
+    --config.role_name<span class="o">=</span><span class="nv">$EXECUTION_ROLE_NAME</span>
+</pre></div>
+</div>
+<p>To download the model artifact after training is complete:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ fahr fetch <span class="nv">$LOCAL_TARGET_DIRECTORY</span> <span class="se">\</span>
+    <span class="nv">$MODEL_IMAGE_TAG</span> <span class="se">\</span>
+    <span class="nv">$S3_ARTIFACT_FILEPATH</span>
+</pre></div>
+</div>
+<p>Where:</p>
+<ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">$MODEL_ARTIFACT_FILEPATH</span></code> is the a path to the file defining the model artifact.</li>
+<li><code class="docutils literal notranslate"><span class="pre">$S3_ARTIFACT_DIRECTORY</span></code> is the S3 directory the model artifact will be deposited in.</li>
+<li><code class="docutils literal notranslate"><span class="pre">$MODEL_IMAGE_TAG</span></code> is the Docker image tag associated with the model. It is dependent on the model filepath: e.g. if <code class="docutils literal notranslate"><span class="pre">$MODEL_ARTIFACT_FILEPATH=.../foo/model.py</span></code> then <code class="docutils literal notranslate"><span class="pre">$MODEL_IMAGE_TAG=foo/model</span></code>.</li>
+<li><code class="docutils literal notranslate"><span class="pre">$EXECUTION_ROLE_NAME</span></code> is the nice name of the user role that SageMaker will assume whilst running this training job.</li>
+</ul>
+</div>
+<div class="section" id="limitations">
+<h2>Limitations<a class="headerlink" href="#limitations" title="Permalink to this headline">¶</a></h2>
+<p>The Amazon EC2 GPU instances that back SageMaker training runs provide CUDA version 9 and cuDNN version 7. When performing GPU training, the base image for your container must be one compatible with these two library versions. For Tensorflow for example this means that your image must be in the 1.5.0 through 1.12.0 version range (<a class="reference external" href="https://www.tensorflow.org/install/source#tested_build_configurations">source</a>).</p>
+<p>The Amazon EC2 GPU instances that back SageMaker training runs only provides Python 3.5 in its root environment. This is a temporary limitation (I haven’t successfully implemented environment virtualization yet) and will probably change in the future.</p>
 </div>
 <div class="section" id="advanced-configuration">
 <h2>Advanced configuration<a class="headerlink" href="#advanced-configuration" title="Permalink to this headline">¶</a></h2>
-<p>TODO</p>
+<p>You can configure what kind and number of compute instance you will use by passing <code class="docutils literal notranslate"><span class="pre">--config.train_instance_count=$COUNT</span></code> and <code class="docutils literal notranslate"><span class="pre">--config.train_instance_type=$TYPE</span></code> to <code class="docutils literal notranslate"><span class="pre">fahr</span> <span class="pre">fit</span></code>. For a list of options see the <a class="reference external" href="https://aws.amazon.com/sagemaker/pricing/">SageMaker pricing guide</a>.</p>
+</div>
+<div class="section" id="tips-and-tricks">
+<h2>Tips and tricks<a class="headerlink" href="#tips-and-tricks" title="Permalink to this headline">¶</a></h2>
+<p>Training via AWS SageMaker requires writing files to the <code class="docutils literal notranslate"><span class="pre">/opt/ml/</span></code> path, which you probably don’t want to do when you are running your training job locally. The SageMaker Docker image template sets a <code class="docutils literal notranslate"><span class="pre">FAHR_EXECUTION_ENVIRONMENT</span></code> environment variable, and you may check this value to determine where to save your output to in your model artifact. For example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span>
+<span class="c1"># running remotely, e.g. launched via &quot;fahr fit&quot;</span>
+<span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;FAHR_EXECUTION_ENVIRONMENT&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;sagemaker&#39;</span><span class="p">:</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;/opt/ml/model.h5&#39;</span><span class="p">)</span>
+<span class="c1"># running locally, e.g. launched via &quot;python&quot;</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;model.h5&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
 </div>
 </div>
 
@@ -191,6 +241,8 @@
           <footer>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../fahr.html" class="btn btn-neutral float-right" title="fahr package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
         <a href="kaggle.html" class="btn btn-neutral float-left" title="Kaggle" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
