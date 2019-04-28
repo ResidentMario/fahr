@@ -24,7 +24,10 @@ It's a better user experience if you can bundle up your current training job, sh
 The workflow
 ------------
 
-The ``build-models.ipynb`` notebook in the demo repo demonstrates the workflow. `Open it yourself <https://github.com/ResidentMario/progressive-resizing/blob/master/notebooks/build-models.ipynb>`_ to follow along.
+The ``build-models.ipynb`` notebook in the demo repo demonstrates the workflow. `Open it yourself <https://github.com/ResidentMario/progressive-resizing/blob/master/notebooks/build-models.ipynb>`_ to follow along. Note that this example uses the `SageMaker driver`_, but all drivers are equally compatible.
+
+.. _SageMaker driver: https://residentmario.github.io/fahr/drivers/sagemaker.html
+
 
 The first time you want to run a remote training job you will need to create some resources:
 
@@ -42,6 +45,7 @@ The first time you want to run a remote training job you will need to create som
             --config.output_path=$S3_ARTIFACT_DIRECTORY \
             --config.role_name=$EXECUTION_ROLE_NAME
 
+   Note the ``--build-driver='local-gpu'`` argument. This specifies that you are building a image that uses the GPU, and requires that you train in a GPU-equipped and configured environment. See the `SageMaker driver`_ instructions to learn more.
 6. You should now have some model training artifacts in your folder. In all non-``kaggle`` cases this will be a ``Dockerfile`` compatible with your training driver and a ``run.sh`` script that acts as the entrypoint to that image. You can edit these to your liking. For exampe, in the demo repo I added some commands to download the dataset to ``run.sh`` (`see here <https://github.com/ResidentMario/progressive-resizing/blob/master/resnet48_128/run.sh>`_).
 7. Run ``fahr fit`` and launch the job:
 
