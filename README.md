@@ -1,4 +1,4 @@
-# fahr [![docs passing](https://img.shields.io/badge/docs-passing-green.svg?style=flat-square)](https://residentmario.github.io/fahr/index.html)
+# fahr ![status beta](https://img.shields.io/badge/status-beta-yellow.svg?style=flat-square) [![PyPi version](https://img.shields.io/pypi/v/fahr.svg?style=flat-square)](https://pypi.python.org/pypi/fahr/) [![docs passing](https://img.shields.io/badge/docs-passing-green.svg?style=flat-square)](https://residentmario.github.io/fahr/index.html)
 
 `fahr` is a command-line tool for building machine learning models on
 cloud hardware with as little overhead as possible.
