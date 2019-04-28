@@ -7,10 +7,13 @@ setup(
         # drivers require addtl packages
         'sagemaker': ['boto3', 'sagemaker'],
         'kaggle': ['kaggle'],
-        # develop contains all addtl packages
+        # all installs all addtl packages
+        'all': ['boto3', 'sagemaker', 'kaggle'],
+        # develop is all addtl packages plus dev stuff
         'develop': [
             'sphinx', 'sphinx_rtd_theme',  # docs
-            'boto3', 'sagemaker'  # sagemaker
+            'boto3', 'sagemaker',  # sagemaker
+            'kaggle'  # kaggle
         ]
     },
     py_modules=['fahr'],

@@ -23,9 +23,12 @@ To learn more about the motivations for developing ``fahr``, read the "Introduci
 
 .. toctree::
    :maxdepth: 2
-   :caption: Sections
+   :glob:
 
    quickstart.rst
+   installation.rst
+
+   :caption: Reference
    API Reference <fahr.rst>
 
 

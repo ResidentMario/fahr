@@ -115,7 +115,6 @@ class TrainJob:
                         )
 
             # Ensure that the input source actually exist.
-            import pdb; pdb.set_trace()
             for dataset in config.get('dataset_sources', []):
                 if subprocess.run(
                     ["kaggle", "datasets", "status", dataset],

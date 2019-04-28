@@ -8,9 +8,9 @@ First install ``fahr``, if you haven't done so already:
 
 .. code-block:: bash
 
-    $ pip install git+https://github.com/ResidentMario/fahr.git@master
+    $ pip install fahr[kaggle]
 
-For the purposes of this demo, I've defined a very simple script, ``train.py``, which builds a tiny ``keras`` feedforward network on synthetic data. This script uses ``numpy`` and ``keras`` so we'll need to install these packages also:
+For the purposes of this demowe will use a very simple ``train.py`` which builds a tiny ``keras`` feedforward network on synthetic data. This script uses ``numpy`` and ``keras`` so we'll need to install these packages also:
 
 .. code-block:: bash
 
@@ -25,7 +25,7 @@ Executing this file saves a model definition file to your local disk:
     $ ls
     model.h5        train.py
 
-``fahr`` takes an **training artifact** such as this one as input. It builds a Docker container wrapping this artifact in a way which is compatible with your chosen **training driver**, then uses the training driver's native API to upload the container and kick off a training job based on that container.
+``fahr`` takes a **training artifact** such as this one as input. It generally builds a Docker container wrapping this artifact in a way which is compatible with your chosen **training driver**, then uses the training driver's native API to upload the container and kick off a training job based on that container.
 
 Let's step through that process now, using this file as our training artifact and `Kaggle Kernels <https://www.kaggle.com/kernels>`_ as our training driver.
 
