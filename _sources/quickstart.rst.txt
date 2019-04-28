@@ -50,6 +50,4 @@ This will download ``model.h5`` to your local machine.
 
 And that's it, you're done!
 
-Every training driver in ``fahr`` uses the same API pattern: ``fit`` to turn a training artifact into a model artifact "on the cloud", then ``fetch`` to download it locally.
-
-However, the configuration options (specified via ``--config.$OPTION_NAME``) vary between training drivers. The ``kaggle`` driver is extremely simple: the only required additional argument is `--config.username`. Other services are more complex. Other drivers require more arguments and/or more advance configuration, but are also more powerful and customizable.
+Every training driver in ``fahr`` uses the same API pattern: ``fit`` to turn a training artifact into a model artifact "on the cloud", then ``fetch`` to download it locally. However, the configuration options (specified via ``--config.$OPTION_NAME``) vary between training drivers. The ``kaggle`` driver is extremely simple: the only required additional argument is ``--config.username``. Other drivers require more arguments and more advance configuration, but are also more powerful. To learn about the drivers available in ``fahr``, or to see more options for working with ``kaggle``, check out the requisite sections of the docs.
