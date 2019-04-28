@@ -169,7 +169,7 @@
 </div>
 <div class="section" id="the-workflow">
 <h2>The workflow<a class="headerlink" href="#the-workflow" title="Permalink to this headline">¶</a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">build-models.ipynb</span></code> notebook in the demo repo demonstrates the workflow. <a class="reference external" href="https://github.com/ResidentMario/progressive-resizing/blob/master/notebooks/build-models.ipynb">Open it yourself</a> to follow along.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">build-models.ipynb</span></code> notebook in the demo repo demonstrates the workflow. <a class="reference external" href="https://github.com/ResidentMario/progressive-resizing/blob/master/notebooks/build-models.ipynb">Open it yourself</a> to follow along. Note that this example uses the <a class="reference external" href="https://residentmario.github.io/fahr/drivers/sagemaker.html">SageMaker driver</a>, but all drivers are equally compatible.</p>
 <p>The first time you want to run a remote training job you will need to create some resources:</p>
 <ol class="arabic">
 <li><p class="first">Once your models get too complex to train comfortably locally, create a <code class="docutils literal notranslate"><span class="pre">models</span></code> folder in your repo.</p>
@@ -190,6 +190,7 @@
 </pre></div>
 </div>
 </div></blockquote>
+<p>Note the <code class="docutils literal notranslate"><span class="pre">--build-driver='local-gpu'</span></code> argument. This specifies that you are building a image that uses the GPU, and requires that you train in a GPU-equipped and configured environment. See the <a class="reference external" href="https://residentmario.github.io/fahr/drivers/sagemaker.html">SageMaker driver</a> instructions to learn more.</p>
 </li>
 <li><p class="first">You should now have some model training artifacts in your folder. In all non-<code class="docutils literal notranslate"><span class="pre">kaggle</span></code> cases this will be a <code class="docutils literal notranslate"><span class="pre">Dockerfile</span></code> compatible with your training driver and a <code class="docutils literal notranslate"><span class="pre">run.sh</span></code> script that acts as the entrypoint to that image. You can edit these to your liking. For exampe, in the demo repo I added some commands to download the dataset to <code class="docutils literal notranslate"><span class="pre">run.sh</span></code> (<a class="reference external" href="https://github.com/ResidentMario/progressive-resizing/blob/master/resnet48_128/run.sh">see here</a>).</p>
 </li>
