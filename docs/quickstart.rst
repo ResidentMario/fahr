@@ -50,4 +50,8 @@ This will download ``model.h5`` to your local machine.
 
 And that's it, you're done!
 
-Every training driver in ``fahr`` uses the same API pattern: ``fit`` to turn a training artifact into a model artifact "on the cloud", then ``fetch`` to download it locally. However, the configuration options (specified via ``--config.$OPTION_NAME``) vary between training drivers. The ``kaggle`` driver is extremely simple: the only required additional argument is ``--config.username``. Other drivers require more arguments and more advance configuration, but are also more powerful. To learn about the drivers available in ``fahr``, or to see more options for working with ``kaggle``, check out the requisite sections of the docs.
+Every training driver in ``fahr`` uses the same API pattern: ``fit`` to turn a training artifact into a model artifact "on the cloud", then ``fetch`` to download it locally. However, the configuration options (specified via ``--config.$OPTION_NAME``) vary between training drivers. The ``kaggle`` driver is extremely simple: the only required additional argument is ``--config.username``. Other drivers require more arguments and more advance configuration, but are also more powerful. 
+
+To learn about the drivers available in ``fahr`` check out the requisite sections of the docs. To dig deeper into the ``fahr`` workflow and see what benefits it may have for your use case, check out the `User Guide`_.
+
+.. _User Guide: https://residentmario.github.io/fahr/user_guide.html
