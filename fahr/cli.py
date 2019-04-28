@@ -90,3 +90,6 @@ cli.add_command(fit)
 cli.add_command(fetch)
 cli.add_command(init)
 cli.add_command(copy)
+
+
+__all__ = ['fit', 'fetch', 'init', 'copy']
