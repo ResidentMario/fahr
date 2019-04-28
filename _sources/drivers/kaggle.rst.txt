@@ -76,6 +76,12 @@ The following configuration options are available for ``fahr fit``:
 Tips and tricks
 ---------------
 
-The preferred way to load data into a kernel is the use a `Kaggle Dataset <https://www.kaggle.com/datasets>`_, which will be available from the `../input/` folder at execution time. However, this requires uploading data to Kaggle, which you may or may not be OK with - datasets can be private, but there is a limit to how much private data you can have.
+The preferred way to load data into a kernel is the use a `Kaggle Dataset <https://www.kaggle.com/datasets>`_, which will be available from the ``../input/`` folder at execution time. However, this requires uploading data to Kaggle, which you may or may not be OK with - datasets can be private, but there is a limit to how much private data you can have.
 
 Alternatively you may use an Internet-enabled kernel and download the data you need that way.
+
+Further reading
+---------------
+
+* `Introduction to Kaggle Kernels <https://towardsdatascience.com/introduction-to-kaggle-kernels-2ad754ebf77>`_
+* `Kaggle API Docs <https://www.kaggle.com/docs/api>`_

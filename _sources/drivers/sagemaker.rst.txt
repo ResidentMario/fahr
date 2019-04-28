@@ -28,7 +28,7 @@ To download your model artifact, pull the file written to S3 and untar it.
 Prerequisites
 -------------
 
-You will need to have an account in AWS (which also means having a credit card on file).
+You will need to have an account in AWS (which also means having a credit card on file), and your account credentials must be available locally (`see the AWS docs for help with this <https://docs.aws.amazon.com/general/latest/gr/aws-sec-cred-types.html>`_).
 
 You will need to have Docker installed and running. If your model requires a GPU, you must furthermore have an Nvidia GPU and the `nvidia docker <https://github.com/NVIDIA/nvidia-docker>`_ toolchain installed, and it must also use a container definition that has this toolchain installed. An easy way to get this environment is to build your image inside of a `SageMaker notebook <https://docs.aws.amazon.com/sagemaker/latest/dg/nbi.html>`_.
 
@@ -88,7 +88,12 @@ Training via AWS SageMaker requires writing files to the ``/opt/ml/`` path, whic
     import os
     # running remotely, e.g. launched via "fahr fit"
     if os.environ.get('FAHR_EXECUTION_ENVIRONMENT') == 'sagemaker':
-        model.save('/opt/ml/model.h5')
+        model.save('/opt/ml/model/model.h5')
     # running locally, e.g. launched via "python"
     else:
         model.save('model.h5')
+
+Further reading
+---------------
+
+* `Building fully custom machine learning models on AWS SageMaker: a practical guide <https://towardsdatascience.com/building-fully-custom-machine-learning-models-on-aws-sagemaker-a-practical-guide-c30df3895ef7>`_
