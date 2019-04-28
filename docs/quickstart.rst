@@ -25,7 +25,7 @@ Executing this file saves a model definition file to your local disk:
     $ ls
     model.h5        train.py
 
-``fahr`` takes a **training artifact** such as this one as input. It generally builds a Docker container wrapping this artifact in a way which is compatible with your chosen **training driver**, then uses the training driver's native API to upload the container and kick off a training job based on that container.
+``fahr`` takes a **training artifact** such as this one as input. Training artifacts may be either ``.py`` Python scripts or ``.ipynb`` Jupyter notebooks. It generally builds a Docker container wrapping this artifact in a way which is compatible with your chosen **training driver**, then uses the training driver's native API to upload the container and kick off a training job based on that container.
 
 Let's step through that process now, using this file as our training artifact and `Kaggle Kernels <https://www.kaggle.com/kernels>`_ as our training driver.
 
@@ -44,7 +44,7 @@ You can visit the web interface to your training job by clicking on the kernel l
 
 .. code-block:: bash
 
-    fahr fetch --driver="kaggle" ./ "$USERNAME/train"
+    fahr fetch --train-driver="kaggle" ./ "$USERNAME/train"
 
 This will download ``model.h5`` to your local machine.
 

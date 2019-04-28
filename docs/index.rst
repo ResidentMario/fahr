@@ -22,13 +22,13 @@ To learn more about the motivations for developing ``fahr``, read the "Introduci
 
 
 .. toctree::
-   :maxdepth: 2
-   :glob:
+   :maxdepth: 1
 
    quickstart.rst
    installation.rst
    API Reference <fahr.rst>
-
+   Kaggle Driver <drivers/kaggle.rst>
+   SageMaker Driver <drivers/sagemaker.rst>
 
 
 Indices and tables
