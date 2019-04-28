@@ -74,7 +74,6 @@
 
         <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           
-    
             
             
               
@@ -83,7 +82,7 @@
               <p class="caption"><span class="caption-text">Sections</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">fahr package</a><ul>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API Reference</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#submodules">Submodules</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-fahr.cli">fahr.cli module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-fahr.fahr">fahr.fahr module</a></li>
@@ -94,9 +93,6 @@
 
             
           
-    <a href="quickstart.html">Quickstart</a>
-    <a href="fahr.html">API Reference</a>
-  
         </div>
       </div>
     </nav>
@@ -224,22 +220,12 @@ Use the static method to fetch model artifacts from other runs.</p>
 </dd></dl>
 
 <dl class="method">
-<dt id="fahr.fahr.TrainJob.run">
-<code class="descname">run</code><span class="sig-paren">(</span><em>path</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#TrainJob.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.fahr.TrainJob.run" title="Permalink to this definition">¶</a></dt>
-<dd><p>Executes a model training job from start to finish, generating a model training artifact 
-in a local repository.</p>
-<dl class="docutils">
-<dt>path: str or pathlib.Path</dt>
-<dd>Directory to write the model artifact to.</dd>
-</dl>
-</dd></dl>
-
-<dl class="method">
 <dt id="fahr.fahr.TrainJob.train">
 <code class="descname">train</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#TrainJob.train"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.fahr.TrainJob.train" title="Permalink to this definition">¶</a></dt>
 <dd><p>Launches a remote training job. Where the job is launched depends on the <cite>train_driver</cite>:</p>
 <ul class="simple">
 <li>sagemaker – The job is run on an EC2 machine via the AWS SageMaker API.</li>
+<li>kaggle – The job is run in a Kaggle Kernel via the Kaggle API.</li>
 </ul>
 </dd></dl>
 
@@ -338,22 +324,12 @@ Use the static method to fetch model artifacts from other runs.</p>
 </dd></dl>
 
 <dl class="method">
-<dt id="fahr.TrainJob.run">
-<code class="descname">run</code><span class="sig-paren">(</span><em>path</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#TrainJob.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.TrainJob.run" title="Permalink to this definition">¶</a></dt>
-<dd><p>Executes a model training job from start to finish, generating a model training artifact 
-in a local repository.</p>
-<dl class="docutils">
-<dt>path: str or pathlib.Path</dt>
-<dd>Directory to write the model artifact to.</dd>
-</dl>
-</dd></dl>
-
-<dl class="method">
 <dt id="fahr.TrainJob.train">
 <code class="descname">train</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/fahr/fahr.html#TrainJob.train"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#fahr.TrainJob.train" title="Permalink to this definition">¶</a></dt>
 <dd><p>Launches a remote training job. Where the job is launched depends on the <cite>train_driver</cite>:</p>
 <ul class="simple">
 <li>sagemaker – The job is run on an EC2 machine via the AWS SageMaker API.</li>
+<li>kaggle – The job is run in a Kaggle Kernel via the Kaggle API.</li>
 </ul>
 </dd></dl>
 

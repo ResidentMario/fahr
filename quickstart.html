@@ -75,7 +75,6 @@
 
         <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           
-    
             
             
               
@@ -83,15 +82,15 @@
             
               <p class="caption"><span class="caption-text">Sections</span></p>
 <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Quickstart</a></li>
-<li class="toctree-l1"><a class="reference internal" href="fahr.html">fahr package</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Quickstart</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#walkthrough">Walkthrough</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="fahr.html">API Reference</a></li>
 </ul>
 
             
           
-    <a href="quickstart.html">Quickstart</a>
-    <a href="fahr.html">API Reference</a>
-  
         </div>
       </div>
     </nav>
@@ -154,7 +153,44 @@
             
   <div class="section" id="quickstart">
 <h1>Quickstart<a class="headerlink" href="#quickstart" title="Permalink to this headline">¶</a></h1>
-<p>TODO.</p>
+<p>This page is a brisk instruction to using <code class="docutils literal notranslate"><span class="pre">fahr</span></code>.</p>
+<div class="section" id="walkthrough">
+<h2>Walkthrough<a class="headerlink" href="#walkthrough" title="Permalink to this headline">¶</a></h2>
+<p>First install <code class="docutils literal notranslate"><span class="pre">fahr</span></code>, if you haven’t done so already:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip install git+https://github.com/ResidentMario/fahr.git@master<span class="sb">`</span>
+</pre></div>
+</div>
+<p>For the purposes of this demo, I’ve defined a very simple script, <code class="docutils literal notranslate"><span class="pre">train.py</span></code>, which builds a tiny <code class="docutils literal notranslate"><span class="pre">keras</span></code> feedforward network on synthetic data. This script uses <code class="docutils literal notranslate"><span class="pre">numpy</span></code> and <code class="docutils literal notranslate"><span class="pre">keras</span></code> so we’ll need to install these packages also:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>yes <span class="p">|</span> pip install numpy keras
+curl https://gist.githubusercontent.com/ResidentMario/ab3ce65a9bd5bc4061237a374fd9e67a/raw/train.py -o train.py
+</pre></div>
+</div>
+<p>Executing this file saves a model definition file to your local disk:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python train.py
+ls
+model.h5        train.py
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">fahr</span></code> takes an <strong>training artifact</strong> such as this one as input. It builds a Docker container wrapping this artifact in a way which is compatible with your chosen <strong>training driver</strong>, then uses the training driver’s native API to upload the container and kick off a training job based on that container.</p>
+<p>Let’s step through that process now, using this file as our training artifact and <a class="reference external" href="https://www.kaggle.com/kernels">Kaggle Kernels</a> as our training driver.</p>
+<p>You will need to have access to the Kaggle API to continue. You will need to have a Kaggle account, so create one if you haven’t done so already. Then, <a class="reference external" href="https://github.com/Kaggle/kaggle-api#api-credentials">follow Kaggle’s instructions</a> to download an auth token to the correct location on your local machine.</p>
+<p>Once everything is tidy you will be able to run the following in your terminal (in all of the lines of code that follow, replace <code class="docutils literal notranslate"><span class="pre">$USERNAME</span></code> with your username on Kaggle):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>fahr fit <span class="s1">&#39;train.py&#39;</span> --train-driver<span class="o">=</span><span class="s1">&#39;kaggle&#39;</span> --config.username<span class="o">=</span><span class="s1">&#39;$USERNAME&#39;</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">fahr</span></code> will log its status to the terminal as it process your job:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>fahr.fahr - INFO - Writing kernel metadata to <span class="s2">&quot;</span><span class="nv">$PATH</span><span class="s2">/kernel-metadata.json&quot;</span>.
+fahr.fahr - INFO - Fitting <span class="nv">$USERNAME</span>/train training job.
+fahr.fahr - INFO - The training job is now running. To track training progress visit https://www.kaggle.com/<span class="nv">$USERNAME</span>/train. To download finished model artifacts run fahr fetch --driver<span class="o">=</span><span class="s2">&quot;kaggle&quot;</span> ./ <span class="s2">&quot;</span><span class="nv">$USERNAME</span><span class="s2">/train&quot;</span> after training is complete.
+</pre></div>
+</div>
+<p>You can visit the web interface to your training job by clicking on the kernel link. Once the job has completed running, you can go ahead and download a <strong>model artifact</strong> using the command documented in the log.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>fahr fetch --driver<span class="o">=</span><span class="s2">&quot;kaggle&quot;</span> ./ <span class="s2">&quot;</span><span class="nv">$USERNAME</span><span class="s2">/train&quot;</span>
+</pre></div>
+</div>
+<p>This will download <code class="docutils literal notranslate"><span class="pre">model.h5</span></code> to your local machine.</p>
+<p>And that’s it, you’re done!</p>
+</div>
 </div>
 
 
