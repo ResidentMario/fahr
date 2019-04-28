@@ -1,3 +1,7 @@
+============
+Installation
+============
+
 You can install ``fahr`` in the standard way using ``pip``:
 
 .. code-block:: bash

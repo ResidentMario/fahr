@@ -27,8 +27,6 @@ To learn more about the motivations for developing ``fahr``, read the "Introduci
 
    quickstart.rst
    installation.rst
-
-   :caption: Reference
    API Reference <fahr.rst>
 
 

@@ -10,7 +10,7 @@ First install ``fahr``, if you haven't done so already:
 
     $ pip install fahr[kaggle]
 
-For the purposes of this demowe will use a very simple ``train.py`` which builds a tiny ``keras`` feedforward network on synthetic data. This script uses ``numpy`` and ``keras`` so we'll need to install these packages also:
+For the purposes of this demo we will use a very simple ``train.py`` which builds a tiny ``keras`` feedforward network on synthetic data. This script uses ``numpy`` and ``keras`` so we'll need to install these packages also:
 
 .. code-block:: bash
 
