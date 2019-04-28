@@ -1,6 +1,9 @@
 # fahr
 
-A simple CLI tool for running my machine learning training jobs on cloud compute. Intended for personal use, but it may eventually grow in scope to be something generally useful.
+`fahr` is a command-line tool for building machine learning models on
+cloud hardware with as little overhead as possible.
+
+`fahr` provides a simple unified interface to model training services like AWS SageMaker and Kaggle Kernels. By offloading model training to the cloud, `fahr` aims to make machine learning experimentation easy and fast.
 
 ## How it works
 

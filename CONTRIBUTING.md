@@ -1,4 +1,4 @@
-`fahr` is alpha-level software, and is still under active development.
+`fahr` is beta software, and is still under active development.
 
 ## Development
 
@@ -28,6 +28,10 @@ pip install -e fahr .[develop]
 ```
 
 Note that `fahr` is currently Python 3.6+ only.
+
+### Tests
+
+There are no tests. :)
 
 ## Documentation
 

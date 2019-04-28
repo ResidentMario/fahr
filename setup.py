@@ -6,6 +6,7 @@ setup(
     extras_require={
         # drivers require addtl packages
         'sagemaker': ['boto3', 'sagemaker'],
+        'kaggle': ['kaggle'],
         # develop contains all addtl packages
         'develop': [
             'sphinx', 'sphinx_rtd_theme',  # docs
