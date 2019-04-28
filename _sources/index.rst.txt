@@ -24,7 +24,7 @@ For a brief introduction refer to the `Quickstart`_.
    :caption: Sections
 
    quickstart.rst
-   API Reference <fahr.rst>
+   fahr.rst
 
 
 
