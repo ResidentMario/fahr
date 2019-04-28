@@ -42,7 +42,7 @@ The website is automatically updated whenever the `gh-pages` branch on GitHub is
 ```sh
 git checkout gh-pages
 rm -rf *
-git checkout docs-index -- docs/ fahr/
+git checkout master -- docs/ fahr/
 cd docs; make html; cd ..
 mv ./docs/_build/html/* ./
 rm -rf docs fahr
