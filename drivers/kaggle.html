@@ -1,0 +1,263 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Kaggle &mdash; fahr 0.0.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+        <script type="text/javascript" src="../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="SageMaker" href="sagemaker.html" />
+    <link rel="prev" title="fahr package" href="../fahr.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> fahr
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../fahr.html">API Reference</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Kaggle Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#specs">Specs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#basic-usage">Basic usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#advanced-configuration">Advanced configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="sagemaker.html">SageMaker Driver</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">fahr</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+      <li>Kaggle</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/drivers/kaggle.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="kaggle">
+<h1>Kaggle<a class="headerlink" href="#kaggle" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+<p><a class="reference external" href="https://www.kaggle.com/kernels">Kaggle Kernels</a> are a completely free cloud compute environment provided by <a class="reference external" href="https://www.kaggle.com/">Kaggle</a>. Kaggle Kernels differ from the other drivers available in <code class="docutils literal notranslate"><span class="pre">fahr</span></code> in that they were designed to be used and shared inside of Kaggle’s community of machine learners, and as a result they are very beginner-friendly and easy to get started with but are not be the best fit for more serious computational work.</p>
+</div>
+<div class="section" id="specs">
+<h2>Specs<a class="headerlink" href="#specs" title="Permalink to this headline">¶</a></h2>
+<p>Kaggle Kernel instances are free to use for registered users. They provide the following resources:</p>
+<ul class="simple">
+<li>9 hours of execution time</li>
+<li>24 GB of disk space</li>
+<li>17 GB of RAM</li>
+<li>4 CPU cores</li>
+<li>2 GPU cores with 14 GB of GPU RAM total (optional extra)</li>
+<li>Internet access (optional extra)</li>
+</ul>
+</div>
+<div class="section" id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this headline">¶</a></h2>
+<p>You will need to create an account on Kaggle. To do this, visit their website.</p>
+<p>You will need to create a Kaggle API key and download that to a specific location on your local disk. You can create a new token by visiting the API section of your user settings. You will need to download that token to <code class="docutils literal notranslate"><span class="pre">~/.kaggle/kaggle.json</span></code> on Linux and macOS or <code class="docutils literal notranslate"><span class="pre">C:\Users\&lt;Windows-username&gt;\.kaggle\kaggle.json</span></code> on Windows.</p>
+</div>
+<div class="section" id="basic-usage">
+<h2>Basic usage<a class="headerlink" href="#basic-usage" title="Permalink to this headline">¶</a></h2>
+<p>To run a training job in a Kaggle kernel:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ fahr fit <span class="nv">$MODEL_ARTIFACT_FILEPATH</span> <span class="se">\</span>
+    --train-driver<span class="o">=</span><span class="s1">&#39;kaggle&#39;</span> <span class="se">\</span>
+    --config.username<span class="o">=</span><span class="nv">$USERNAME</span>
+</pre></div>
+</div>
+<p>Where <code class="docutils literal notranslate"><span class="pre">$MODEL_ARTIFACT_FILEPATH</span></code> is the path to your model artifact and <code class="docutils literal notranslate"><span class="pre">$USERNAME</span></code> is your Kaggle username.</p>
+<p>The will create a new <code class="docutils literal notranslate"><span class="pre">$USERNAME/$FILENAME</span></code> kernel on Kaggle, or a new version of this kernel if it already exists. You will be given a link to the online kernel page, which you can use to monitor its status.</p>
+<p>To download the model artifacts from a completed training job:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ fahr fetch  --train-driver<span class="o">=</span><span class="s1">&#39;kaggle&#39;</span> <span class="se">\</span>
+    ./
+    <span class="nv">$USERNAME</span>/<span class="nv">$FILENAME</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="advanced-configuration">
+<h2>Advanced configuration<a class="headerlink" href="#advanced-configuration" title="Permalink to this headline">¶</a></h2>
+<p>The following configuration options are available:</p>
+<ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">enable_gpu</span></code> - Train in a GPU environment. Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>. To enable pass <code class="docutils literal notranslate"><span class="pre">--config.enable_gpu=True</span></code>.</li>
+<li><code class="docutils literal notranslate"><span class="pre">enable_internet</span></code> - Train in an Internet-connected environment. Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>. To enable pass <code class="docutils literal notranslate"><span class="pre">--config.enable_internet=True</span></code>.</li>
+<li><code class="docutils literal notranslate"><span class="pre">is_private</span></code> - Whether the resultant kernel is publicly visible or not. Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>. To make your kernel private pass <code class="docutils literal notranslate"><span class="pre">--config.is_private</span></code>.</li>
+<li><code class="docutils literal notranslate"><span class="pre">dataset_sources</span></code> - What <a class="reference external" href="https://www.kaggle.com/datasets">Kaggle Datasets</a> to include in the kernel environment. Defaults to <code class="docutils literal notranslate"><span class="pre">None</span></code>. To add datasets to the environment pass <code class="docutils literal notranslate"><span class="pre">--config.dataset_sources=[&quot;owner/dataset&quot;,</span> <span class="pre">&quot;otherowner/otherdataset&quot;]</span></code>.</li>
+<li><code class="docutils literal notranslate"><span class="pre">kernel_sources</span></code> - What  Kaggle Kernel data out;uts to include in the kernel environment. Defaults to <code class="docutils literal notranslate"><span class="pre">None</span></code>. To add datasets to the environment pass <code class="docutils literal notranslate"><span class="pre">--config.kernel_sources=[&quot;user/kernelname&quot;,</span> <span class="pre">&quot;otheruser/otherkernelname&quot;]</span></code>.</li>
+<li><code class="docutils literal notranslate"><span class="pre">competition_sources</span></code> - What <a class="reference external" href="https://www.kaggle.com/competitions">Kaggle Competitions</a> data to include in the kernel environment. Only active competitions may have their data included in this way via the API, and you must have already agreed to the rules of the competition via the Kaggle website. To add competition data to the environment pass <code class="docutils literal notranslate"><span class="pre">--config.competition_sources=[&quot;owner/dataset&quot;,</span> <span class="pre">&quot;otherowner/otherdataset&quot;]</span></code>.</li>
+</ul>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="sagemaker.html" class="btn btn-neutral float-right" title="SageMaker" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="../fahr.html" class="btn btn-neutral float-left" title="fahr package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, Aleksey Bilogur
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
