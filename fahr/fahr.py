@@ -28,39 +28,54 @@ class TrainJob:
         envfile=None, overwrite=False, config=None,
     ):
         """
-        Trains a machine learning model on the cloud.
+        Object encapsulating a machine learning training job.
 
         Parameters
         ----------
         filepath: str
-            Path to the model training artifact to be executed remotely. 
-            Currently only Jupyter notebooks are supported.
+            Path to the model definition to be executed remotely. A model definition
+            is an executable code object (currently either a Jupyter notebook or a Python script,
+            plus optional supporting files), whose output is a model artifact (a serialized model,
+            a saved weights matrix, etcetera).
         build_driver: str
-            The driver (service) that will build the model training image. The options are:
+            The model definition (see `filepath`) is packaged into a Docker image before being sent
+            off to train, creating a model training image. The build driver controls which
+            service is used to perform this step. Currently the following options are supported:
 
-            * 'local' -- Builds the model container on your local machine w/o GPU.
-            * 'local-gpu' -- Builds the model container on your local machine w/ GPU.
-        
-            Note that if you are using the Kaggle training driver, no build driver needs to be 
-            specified.
+            * 'local' -- Builds the model container on your local machine without GPU.
+            * 'local-gpu' -- Builds the model container on your local machine with GPU support.
+              Note that this options requires a machine with a GPU onboard and nvidia-docker
+              (https://github.com/NVIDIA/nvidia-docker) installed.
+
+            Note: when using the Kaggle training driver, you are locked into the Docker image
+            provided by the default in the Kaggle kernels environment, and this parameter may be
+            left blank.
         train_driver: str
-            The driver (service) that will perform the training. Currently the options are:
+            The training driver (service) is the compute platform that performs the training
+            (executes the model training image). Currently the following options are supported:
 
             * 'sagemaker' -- Launches a model training job on Amazon using AWS SageMaker.
             * 'kaggle' -- Launches a model training job on Kaggle using Kaggle Kernels.
 
-            Future options include 'ml-engine'.
-        envfile: str
-            Optional path to the file that defines the environment that will be built in the image.
-            Must be a "requirements.txt" file (which will be parsed with `pip`). If left unspecified
-            the file present in the build directory will be used.
-        overwrite: bool
-            If set to False `TrainJob` will respect any Dockerfile and run.sh files already present
-            in the build directory. If set to True it will overwrite them.
+            Support for GCP ML Engine ('ml-engine') is planned.
+        envfile: str, optional
+            Optional path to a `requirements.txt` file. If left unspecified the file present in
+            the build directory will be used (and if no `requirements.txt` is present, an error
+            will be raised).
+            
+            The envfile defines the list of packages that will be included into the model training
+            artifact, and should contain every dependency necessary for the model to train
+            successfully.
+            
+            Support for the `conda` `environment.yaml` format is planned.
+        overwrite: bool, default False
+            Set this value to True to overwrite any already-created model definition files
+            (e.g. `run.sh`).
         config: dict
             A dict of driver-specific configuration variables used to inform how the job is run.
             The precise list of configuration options differs from driver to driver. See the
-            documentation for more information.
+            online documentation (https://residentmario.github.io/fahr/index.html) for more
+            information.
         """
         filepath = pathlib.Path(filepath).absolute()
         dirpath = filepath.parent
@@ -204,7 +219,7 @@ class TrainJob:
 
     def build(self):
         """
-        Builds the model training image locally.
+        Builds the model training image. This is the first step in the model training workflow.
         """
         if self.train_driver != 'kaggle':
             if self.build_driver == 'local' or self.build_driver == 'local-gpu':
@@ -216,10 +231,12 @@ class TrainJob:
 
     def push(self):
         """
-        Pushes the model training image to a remote repository. The repository used depends on the
-        `train_driver`:
+        Pushes the model training image to a remote image repository. This is the second step in
+        the model training workflow, as it is a necessary prerequesite to executing the model
+        training image. The repository used depends on the `train_driver`:
 
         * 'sagemaker' -- Pushes the image to Amazon ECR.
+        * 'kaggle' -- Does nothing, only the default runtime environment is available.
         """
         if self.train_driver == 'sagemaker':
             import boto3
@@ -271,7 +288,8 @@ class TrainJob:
 
     def train(self):
         """
-        Launches a remote training job. Where the job is launched depends on the `train_driver`:
+        Launches a remote training job. The third and most critical step in the model
+        training workflow. Where the job is launched depends on the `train_driver`:
 
         * sagemaker -- The job is run on an EC2 machine via the AWS SageMaker API.
         * kaggle -- The job is run in a Kaggle Kernel via the Kaggle API.
@@ -387,7 +405,8 @@ class TrainJob:
 
     def fetch(self, local_path, extract=True):
         """
-        Extracts the model artifacts generated by the training job to `path`.
+        Extracts the model artifacts generated by the training job to `path`. This is the last step
+        in the model training workflow.
 
         This method is a convenience wrapper over the `fetch` static method. Use this method to
         fetch model artifacts generated by executing `train` on the current `TrainingJob` instance.
@@ -416,6 +435,10 @@ class TrainJob:
         """
         Executes a model training job, generating a model training artifact in a local repository.
 
+        This is a convenience method that combines the first three steps of the model training
+        workflow: building the model training image, pushing it to a remote repository, and
+        executing it.
+        
         Parameters
         ----------
         path: str or pathlib.Path
