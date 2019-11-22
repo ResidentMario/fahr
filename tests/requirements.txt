@@ -1,0 +1,6 @@
+# Dependencies specific to CI/CD tests
+pytest>=5.2.4
+pytest-socket>=0.3.3
+pyyaml>=5.1.2  # automatic locally but must be manually specified on travis, for some reason
+requests==2.20.1  # sagemaker raises ContextualVersionConflict w/ ==2.22.0 at this time
+python-dateutil==2.7.5  # sagemaker raises ContextualVersionConflict w/ ==2.8.1 at this time

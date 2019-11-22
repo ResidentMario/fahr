@@ -1,0 +1,15 @@
+dist: xenial
+language: python
+python:
+  - "3.7"
+install:
+  - pip install -r tests/requirements.txt
+  - pip install .[all]
+  # sagemaker will refuse init without a default region set
+  - mkdir ~/.aws/;
+    touch ~/.aws/config;
+    echo "[default]" >> ~/.aws/config;
+    echo "region = us-east-1" >> ~/.aws/config
+script:
+  # defensively run with --disable-socket to raise on any hidden network requests
+  - cd tests; pytest --disable-socket test_fahr.py

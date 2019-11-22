@@ -90,8 +90,13 @@ class TrainJob:
 
         # Check driver-specific configuration requirements
         if train_driver == 'sagemaker':
-            if config is None or 'output_path' not in config:
+            if (config is None or
+                'output_path' not in config or
+                not config['output_path'].startswith('s3://')):
                 raise ValueError('The SageMaker driver requires an output_path to "s3://".')
+
+            if 'role_name' not in config:
+                raise ValueError('The SageMaker driver requires a role name.')
 
             # Ensure that the job name is always a valid ARN name
             tag = f'{dirpath.stem}/{filepath.stem}'.replace("/", "-").replace("_", "-")
@@ -172,12 +177,9 @@ class TrainJob:
                         '"envfile" must point to "requirements.txt" file'
                     )
             else:
-                pip_reqfile = dirpath / 'requirements.txt'
-                pip_reqfile_exists = pip_reqfile.exists()
-                if not pip_reqfile_exists:
-                    raise ValueError('No requirements.txt present and no "envfile" specified.')
-                else:
-                    envfile = pip_reqfile
+                envfile = dirpath / 'requirements.txt'
+            if not envfile.exists():
+                raise ValueError('No requirements.txt present and no "envfile" specified.')
 
             logger.info(f'Using "{envfile}" as envfile.')
 
@@ -277,8 +279,6 @@ class TrainJob:
 
             self.session = session
             self.repository = repository
-            # TODO: does reusing the client actually save a network request?
-            self.sts_client = sts_client
 
         elif self.train_driver == 'kaggle':
             return
@@ -299,25 +299,20 @@ class TrainJob:
             import sagemaker as sage
 
             iam_client = boto3.client('iam')
+            sts_client = boto3.client('sts')
 
-            default_role_name = 'fahr_sagemaker_role'
-            role_name = self.config.pop('role_name', default_role_name)
+            # role_name is a required parameter at initialization time
+            role_name = self.config['role_name']
+
             # TODO: try to catch the botocore.errorfactory.RepositoryNotFound error
             try:
                 role_info = iam_client.get_role(RoleName=role_name)
             except:
-                if role_name != default_role_name:
-                    raise ValueError(
-                        f'The {role_name} role does not exist, you must create it first.'
-                    )
-                else:
-                    # TODO: step through the flow for creating the default if it doesn't exist
-                    # https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user.html
-                    raise NotImplementedError
-                    # role = iam_client.create_role(RoleName='fahr-test')
+                raise ValueError(
+                    f'The {role_name} role does not exist, you must create it first.'
+                )
 
             # if the current execution context is not the `role_name` role, assume it
-            sts_client = self.sts_client if hasattr(self, 'sts_client') else boto3.client('sts')
             current_execution_context_arn = sts_client.get_caller_identity()['Arn']
 
             if f'assumed-role/{role_name}' in current_execution_context_arn:
@@ -342,18 +337,24 @@ class TrainJob:
                 aws_secret_access_key=aws_secret_access_key, 
                 aws_session_token=aws_session_token
             )
+
+            # If the repository identifier is not already known (from having run push beforehand)
+            # relearn it here. We take care to use the boto3 Session object for this, not the
+            # sagemaker Session object; the latter is slightly different.
+            if not hasattr(self, 'repository'):
+                _, _, self.repository = get_repository_info(
+                    assumed_role_session, self.tag, sts_client
+                )
+
             session = sage.Session(boto_session=assumed_role_session)
             execution_role = sage.get_execution_role(sagemaker_session=session)
-
-            if not hasattr(self, 'repository'):
-                _, _, self.repository = get_repository_info(session, self.tag, sts_client)
 
             train_instance_count = self.config.pop('train_instance_count', 1)
             train_instance_type = self.config.pop('train_instance_type', 'ml.c4.2xlarge')
             output_path = self.config['output_path']
             clf = sage.estimator.Estimator(
-                self.repository, execution_role, 
-                train_instance_count, train_instance_type,
+                image_name=self.repository, role=execution_role, 
+                train_instance_count=train_instance_count, train_instance_type=train_instance_type,
                 output_path=output_path,
                 sagemaker_session=session
             )
@@ -426,8 +427,10 @@ class TrainJob:
         if not hasattr(self, 'job_name'):
             raise ValueError('Cannot fetch TrainJob model artifacts without fitting first.')
 
+        # If the Kaggle driver is used, output_path is None.
+        output_path = self.config.get('output_path', None)
         return fetch(
-            local_path, self.tag, self.config['output_path'], 
+            local_path, self.tag, remote_path=output_path, train_driver=self.train_driver,
             extract=extract, job_name=self.job_name
         )
 
@@ -729,11 +732,10 @@ def create_kaggle_resources(
         json.dump(kernel_metadata, fp)
 
 
-def get_repository_info(session, tag, sts_client=None):
+def get_repository_info(session, tag, sts_client):
     """
     Identify the ECR repository for a given tag. SageMaker only.
     """
-    sts_client = sts_client if sts_client else session.client('sts')
     account_id = sts_client.get_caller_identity()['Account']
     region = session.region_name
 
@@ -748,7 +750,7 @@ def get_previous_job_name(tag):
     """
     import boto3
     
-    # FIXME: support paginated requests, as otherwise most recent run can fall of the list
+    # TODO: support paginated requests, as otherwise most recent run can fall of the list
     sagemaker_client = boto3.client('sagemaker')
     finished_jobs = sagemaker_client.list_training_jobs()['TrainingJobSummaries']
     prefix = f'fahr-{tag.replace("/", "-").replace("_", "-")}'
