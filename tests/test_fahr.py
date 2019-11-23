@@ -4,6 +4,8 @@ import pytest
 import pathlib
 from copy import deepcopy
 import base64
+import warnings
+from datetime import datetime
 
 import boto3
 import botocore
@@ -14,8 +16,8 @@ from botocore.stub import Stubber, ANY
 import fahr
 from fahr import TrainJob
 
-FILEPATH = pathlib.Path('./fixtures/train_simple/train.py').expanduser().absolute()
-ENVFILE = pathlib.Path('./fixtures/train_simple/requirements.txt').expanduser().absolute()
+FILEPATH = pathlib.Path('./fixtures/train_sagemaker/train.py').expanduser().absolute()
+ENVFILE = pathlib.Path('./fixtures/train_sagemaker/requirements.txt').expanduser().absolute()
 kaggle_kwargs = {
     'build_driver': 'local', 'train_driver': 'kaggle',
     'config': {'username': 'TestUsername'}
@@ -26,8 +28,8 @@ sagemaker_kwargs = {
 }
 def create_resources_mock(*args, **kwargs):
     return (
-        pathlib.Path('./fixtures/train_simple/Dockerfile').expanduser().absolute(),
-        pathlib.Path('./fixtures/train_simple/run.sh').expanduser().absolute()
+        pathlib.Path('./fixtures/train_sagemaker/Dockerfile').expanduser().absolute(),
+        pathlib.Path('./fixtures/train_sagemaker/run.sh').expanduser().absolute()
     )
 
 class TestTrainJobInit(unittest.TestCase):
@@ -35,18 +37,24 @@ class TestTrainJobInit(unittest.TestCase):
     Test TrainJob object initialization. The only work that is performed at this step is a lot of
     parameter validation.
     """
+    def test_invalid_no_required_parameters(self):
+        with pytest.raises(ValueError):  # neither filepath nor job_name is specified
+            TrainJob(**kaggle_kwargs)
+
     def test_invalid_train_driver(self):
         with pytest.raises(NotImplementedError):  # train driver not in list of accepted drivers
-            TrainJob(FILEPATH, train_driver='nondriver')
+            TrainJob(filepath=FILEPATH, train_driver='nondriver')
 
     def test_invalid_build_driver(self):
         with pytest.raises(NotImplementedError):  # build driver not in list of accepted drivers
-            TrainJob(FILEPATH, **{**kaggle_kwargs, **{'build_driver': 'nondriver'}})
+            TrainJob(filepath=FILEPATH, **{**kaggle_kwargs, **{'build_driver': 'nondriver'}})
 
     def test_kaggle_init_valid(self):
         # test basic initialization with the kaggle driver
-        with patch('fahr.fahr.create_kaggle_resources'):
-            j = TrainJob(FILEPATH, **kaggle_kwargs)
+        with patch('fahr.fahr.create_kaggle_resources', new=create_resources_mock):
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                j = TrainJob(filepath=FILEPATH, **kaggle_kwargs)
 
         assert j.filepath == FILEPATH
         assert j.train_driver == 'kaggle'
@@ -56,87 +64,89 @@ class TestTrainJobInit(unittest.TestCase):
         kwargs = deepcopy(kaggle_kwargs)
         del kwargs['config']['username']
         with pytest.raises(ValueError):  # no username
-            TrainJob(FILEPATH, **kwargs)
+            TrainJob(filepath=FILEPATH, **kwargs)
         
     def test_kaggle_init_invalid_non_existant_model_file(self):
         with pytest.raises(ValueError):  # non-existent model definition file
-            TrainJob('./not/a/file.py', **kaggle_kwargs)
+            TrainJob(filepath='./not/a/file.py', **kaggle_kwargs)
 
     @patch('pathlib.Path.exists', lambda _: True)
     def test_kaggle_init_invalid_model_file_fails_regex(self):
         with pytest.raises(ValueError):  # file name fails kernel regex
-            TrainJob('!@#$.py', **kaggle_kwargs)
+            TrainJob(filepath='!@#$.py', **kaggle_kwargs)
 
     def test_kaggle_init_invalid_sources(self):
         # sources are not valid input types
         kwargs = deepcopy(kaggle_kwargs)
         kwargs['config'].update({'dataset_sources': {}})
         with pytest.raises(ValueError):
-            TrainJob(FILEPATH, **kwargs)
+            TrainJob(filepath=FILEPATH, **kwargs)
 
         kwargs = deepcopy(kaggle_kwargs)
         kwargs['config'].update({'kernel_sources': {}})
         with pytest.raises(ValueError):
-            TrainJob(FILEPATH, **kwargs)
+            TrainJob(filepath=FILEPATH, **kwargs)
 
         kwargs = deepcopy(kaggle_kwargs)
         kwargs['config'].update({'competition_sources': {}})
         with pytest.raises(ValueError):
-            TrainJob(FILEPATH, **kwargs)
-
-    def test_kaggle_init_invalid_envfile(self):
-        with pytest.raises(ValueError):  # an envfile is not allowed with this driver
-            TrainJob(FILEPATH, envfile=ENVFILE, **kaggle_kwargs)
+            TrainJob(filepath=FILEPATH, **kwargs)
 
     # TODO: test the case that envfile is unspecified and the default envfile doesn't exist
 
     @patch('pathlib.Path.exists', lambda _: True)
     def test_init_invalid_envfile(self):
         with pytest.raises(ValueError):  # envfile is not a requirements.txt
-            TrainJob(FILEPATH, envfile='./environment.yml', **sagemaker_kwargs)
+            TrainJob(filepath=FILEPATH, envfile='./environment.yml', **sagemaker_kwargs)
 
-    def test_init_invalid_no_envfile(self):
+    def test_sagemaker_init_no_envfile(self):
         with pytest.raises(ValueError):  # envfile doesn't exist
-            TrainJob(FILEPATH, envfile='./not/a/requirements.txt', **sagemaker_kwargs)
+            TrainJob(filepath=FILEPATH, envfile='./not/a/requirements.txt', **sagemaker_kwargs)
 
     def test_sagemaker_init_valid(self):
         # test basic initialization with the sagemaker driver
-        with patch('fahr.fahr.create_resources', new=create_resources_mock):
-            j = TrainJob(FILEPATH, **sagemaker_kwargs)
+        with patch('fahr.fahr.create_sagemaker_resources', new=create_resources_mock):
+            j = TrainJob(filepath=FILEPATH, **sagemaker_kwargs)
 
         assert j.filepath == FILEPATH
         assert j.train_driver == 'sagemaker'
-        assert j.tag == 'train-simple-train'
+        assert j.tag == 'train-sagemaker-train'
 
     def test_sagemaker_init_invalid_no_output_path(self):
         kwargs = deepcopy(sagemaker_kwargs)
         del kwargs['config']['output_path']
 
         with pytest.raises(ValueError):  # no output_path
-            TrainJob(FILEPATH, **kwargs)
+            TrainJob(filepath=FILEPATH, **kwargs)
 
     def test_sagemaker_init_invalid_non_s3_output_path(self):
         kwargs = deepcopy(sagemaker_kwargs)
         kwargs['config']['output_path'] = 'not-s3://nonexistent-bucket/out/'
 
         with pytest.raises(ValueError):  # invalid output_path
-            TrainJob(FILEPATH, **kwargs)
+            TrainJob(filepath=FILEPATH, **kwargs)
 
     def test_sagemaker_init_invalid_no_role_name(self):
         kwargs = deepcopy(sagemaker_kwargs)
         del kwargs['config']['role_name']
 
         with pytest.raises(ValueError):  # no role_name
-            TrainJob(FILEPATH, **kwargs)
+            TrainJob(filepath=FILEPATH, **kwargs)
 
+    def test_valid_init_from_job(self):
+        j = TrainJob(job_name='TestUser/train-simple-train', **kaggle_kwargs)
+        assert j.job_name == 'TestUser/train-simple-train'
+        assert j.status == 'complete'
 
 class TestTrainJobBuild(unittest.TestCase):
     """
     Test the TrainJob build method, used to build the model training image.
     """
     def test_kaggle_build(self):  # no-op
-        with patch('fahr.fahr.create_kaggle_resources'):
-            j = TrainJob(FILEPATH, **kaggle_kwargs)
+        with patch('fahr.fahr.create_kaggle_resources', new=create_resources_mock):
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                j = TrainJob(filepath=FILEPATH, **kaggle_kwargs)
     
         j.docker_client = Mock()
         j.build()
@@ -144,21 +154,23 @@ class TestTrainJobBuild(unittest.TestCase):
         assert j.docker_client.images.build.called == False
     
     def test_sagemaker_build(self):
-        with patch('fahr.fahr.create_resources', new=create_resources_mock):
-            j = TrainJob(FILEPATH, **sagemaker_kwargs)
+        with patch('fahr.fahr.create_sagemaker_resources', new=create_resources_mock):
+            j = TrainJob(filepath=FILEPATH, **sagemaker_kwargs)
         j.docker_client = Mock()
         j.build()
 
         j.docker_client.images.build.assert_called_once_with(
             path=str(FILEPATH.parent),
             rm=True,
-            tag='train-simple-train'
+            tag='train-sagemaker-train'
         )
 
 
 def test_kaggle_push():  # no-op
-    with patch('fahr.fahr.create_kaggle_resources'):
-        j = TrainJob(FILEPATH, **kaggle_kwargs)
+    with patch('fahr.fahr.create_kaggle_resources', new=create_resources_mock), \
+    warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        j = TrainJob(filepath=FILEPATH, **kaggle_kwargs)
     j.docker_client = Mock()
     j.push()
     assert j.docker_client.images.push.called == False
@@ -182,7 +194,7 @@ class TestTrainJobSagemakerPush(unittest.TestCase):
 
         self.ecr_stubber.add_response(
             'list_images', service_response={},
-            expected_params={'registryId': '1234', 'repositoryName': 'train-simple-train'}
+            expected_params={'registryId': '1234', 'repositoryName': 'train-sagemaker-train'}
         )
         self.ecr_stubber.add_response(
             'get_authorization_token', service_response={
@@ -217,13 +229,13 @@ class TestTrainJobSagemakerPush(unittest.TestCase):
         self.sts_stubber.deactivate()
 
     def test_sagemaker_push(self):
-        with patch('fahr.fahr.create_resources', new=create_resources_mock), \
+        with patch('fahr.fahr.create_sagemaker_resources', new=create_resources_mock), \
             patch('boto3.session.Session') as sesh_mock, \
             patch('boto3.client', new=self.client), \
             patch('docker.client.from_env'):
             sesh_mock.return_value.region_name = 'us-east-1'
 
-            j = TrainJob(FILEPATH, **sagemaker_kwargs)
+            j = TrainJob(filepath=FILEPATH, **sagemaker_kwargs)
             j.push()
 
             # The actual test itself checks that:
@@ -235,7 +247,7 @@ class TestTrainJobSagemakerPush(unittest.TestCase):
                 'abcd', '1234', registry='https://1234.dkr.ecr.region.amazonaws.com'
             )
             j.docker_client.images.push.assert_called_once_with(
-                '1234.dkr.ecr.us-east-1.amazonaws.com/train-simple-train'
+                '1234.dkr.ecr.us-east-1.amazonaws.com/train-sagemaker-train'
             )
 
 
@@ -298,13 +310,13 @@ class TestTrainJobSagemakerTrain(unittest.TestCase):
     # network requests: running this test with `--disable-socket` (via the `pytest-socket` plugin)
     # does not expedite the process or result in any errors.
     def test_sagemaker_train(self):
-        with patch('fahr.fahr.create_resources', new=create_resources_mock), \
+        with patch('fahr.fahr.create_sagemaker_resources', new=create_resources_mock), \
             patch('boto3.client', new=self.client), \
             patch('sagemaker.get_execution_role',
                   return_value='arn:aws:sts::1234:assumed-role/TestRole'), \
             patch('fahr.fahr.get_next_job_name', return_value='fahr-train-simple-train-1'), \
             patch('sagemaker.estimator.Estimator') as estimator_mock:
-            j = TrainJob(FILEPATH, **sagemaker_kwargs)
+            j = TrainJob(filepath=FILEPATH, **sagemaker_kwargs)
             j.session = Mock()
             j.session.get_credentials.return_value.get_frozen_credentials.return_value =\
                 botocore.credentials.ReadOnlyCredentials(
@@ -327,47 +339,116 @@ class TestTrainJobSagemakerTrain(unittest.TestCase):
             estimator_mock.return_value.fit.assert_called_once_with(
                 job_name='fahr-train-simple-train-1', wait=False
             )
+            assert j.status == 'submitted'
 
 
-class TestTrainJobKaggleTrain(unittest.TestCase):
+def test_kaggle_train():
     """
     Test the TrainJob train method with the Kaggle API.
     """
-    def test_kaggle_train(self):
-        with patch('subprocess.run') as run_mock, \
-            patch('fahr.fahr.create_kaggle_resources'):
-            j = TrainJob(FILEPATH, **kaggle_kwargs)
-            j.fit()
-            run_mock.assert_called_once_with(
-                ["kaggle", "kernels", "push", "-p", FILEPATH.parent.as_posix()],
-                stderr=ANY, stdout=ANY
-            )
+    with patch('subprocess.run') as run_mock, \
+        patch('fahr.fahr.create_kaggle_resources', new=create_resources_mock), \
+        warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        j = TrainJob(filepath=FILEPATH, **kaggle_kwargs)
+        j.train()
+        run_mock.assert_called_once_with(
+            ["kaggle", "kernels", "push", "-p", FILEPATH.parent.as_posix()],
+            stderr=ANY, stdout=ANY
+        )
+        assert j.status == 'submitted'
 
 
-# TODO: refactor fetch to be a TrainJob method, and TrainJob init to allow for old job init.
-# TODO: and properly test the fetch method itself, for both SageMaker and Kaggle APIs.
-def test_train_job_fetch():
+def test_kaggle_fetch():
     """
-    Test the TrainJob object fetch method (which calls out to the fahr method).
+    Test the TrainJob fetch method with the Kaggle API.
     """
-    with patch('fahr.fahr.fetch') as fetch_mock, \
-        patch('fahr.fahr.create_kaggle_resources'), \
-        patch('fahr.fahr.create_resources', new=create_resources_mock):
-            j = TrainJob(FILEPATH, **kaggle_kwargs)
-            j.job_name = 'fahr-train-simple-train-1'
-            j.fetch('./')
-            fetch_mock.assert_called_once_with(
-                './', 'TestUsername/train', extract=True, job_name='fahr-train-simple-train-1',
-                remote_path=None, train_driver='kaggle'
-            )
-            fetch_mock.reset_mock()
+    with patch('subprocess.run') as run_mock, \
+        patch('fahr.fahr.create_kaggle_resources', new=create_resources_mock), \
+        warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        j = TrainJob(filepath=FILEPATH, **kaggle_kwargs)
+        j.train()
+        j.fetch('./')
+        run_mock.assert_called_with(
+            ["kaggle", "kernels", "output", j.tag, "-p", pathlib.Path('.')],
+            stderr=ANY, stdout=ANY
+        )
 
-            j = TrainJob(FILEPATH, **sagemaker_kwargs)
-            j.job_name = 'fahr-train-simple-train-1'
-            j.fetch('./')
-            fetch_mock.assert_called_once_with(
-                './', 'train-simple-train', extract=True, job_name='fahr-train-simple-train-1',
-                remote_path='s3://nonexistent-bucket/out/', train_driver='sagemaker'
+
+class TestTrainJobSagemakerFetch(unittest.TestCase):
+    """
+    Test the TrainJob fetch method with SageMaker API.
+
+    The botocore stubber does not support the boto3 S3 client's download_file operation; we have to
+    patch this manually.
+    """
+    def setUp(self):
+        s3 = boto3.client(
+            's3', region_name='us-east-1', config=Config(signature_version=UNSIGNED)
+        )
+        s3.download_file = Mock()
+        self.download_file_mock = s3.download_file
+
+        sagemaker = boto3.client(
+            'sagemaker', region_name='us-east-1', config=Config(signature_version=UNSIGNED) 
+        )
+        self.sagemaker_stubber = Stubber(sagemaker)
+        self.sagemaker_stubber.add_response(
+            'describe_training_job', service_response={
+                'TrainingJobName': 'fahr-train-simple-train-1',
+                'TrainingJobArn': 'arn:aws:sagemaker:us-east-1:1234:training-job/' +\
+                    'fahr-train-simple-train-1',
+                'ModelArtifacts': {
+                    'S3ModelArtifacts': 's3://nonexistent-bucket/out/fahr-train-simple-train-1' +\
+                        '/output/model.tar.gz'
+                },
+                'TrainingJobStatus': 'Completed',
+                'SecondaryStatus': 'Completed',
+                'AlgorithmSpecification': {'TrainingInputMode': 'File'},
+                'ResourceConfig': {
+                    'InstanceType': 'ml.t2.large', 'InstanceCount': 1, 'VolumeSizeInGB': 2
+                },
+                'StoppingCondition': {},
+                'CreationTime': datetime(2015, 1, 1)
+            },
+            expected_params={'TrainingJobName': 'train-simple-train-1'}
+        )
+        self.sagemaker_stubber.activate()
+
+        def client(svc):
+            """
+            Replace the new service client constructor with a constructor that returns the stubbed
+            versions.
+            """
+            if svc == 's3':
+                return s3
+            elif svc == 'sagemaker':
+                return sagemaker
+            else:
+                raise ValueError
+        self.client = client
+    
+    def tearDown(self):
+        self.sagemaker_stubber.deactivate()
+
+    def test_sagemaker_fetch(self):
+        def get_previous_jobs_mock(tag):
+            return [{'ModelArtifacts': {
+                'S3ModelArtifacts': 's3://nonexistent-bucket/out/train-simple-train-1/model.tar.gz'
+            }}]
+
+        with patch('fahr.fahr.create_sagemaker_resources', new=create_resources_mock), \
+            patch('boto3.client', new=self.client), \
+            patch('fahr.fahr.get_previous_jobs', new=get_previous_jobs_mock):
+            j = TrainJob(filepath=FILEPATH, **sagemaker_kwargs)
+            j.job_name = 'train-simple-train-1'
+            j.status = 'complete'
+            j.fetch('./', extract=False)
+            self.download_file_mock.assert_called_once_with(
+                'nonexistent-bucket',
+                'out/train-simple-train-1/output/model.tar.gz',
+                (pathlib.Path('.').absolute() / 'model.tar.gz').as_posix()
             )
 
 

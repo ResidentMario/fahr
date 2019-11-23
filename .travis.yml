@@ -13,3 +13,4 @@ install:
 script:
   # defensively run with --disable-socket to raise on any hidden network requests
   - cd tests; pytest --disable-socket test_fahr.py
+  - cd tests; pytest test_cli.py

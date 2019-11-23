@@ -9,6 +9,7 @@ import shutil
 import json
 import ast
 import subprocess
+import warnings
 
 import docker
 import jinja2
@@ -24,8 +25,8 @@ if not logger.handlers:
 
 class TrainJob:
     def __init__(
-        self, filepath, build_driver='local', train_driver='sagemaker', 
-        envfile=None, overwrite=False, config=None,
+        self, filepath=None, job_name=None, build_driver='local', train_driver='sagemaker',
+        envfile=None, overwrite=False, config=None
     ):
         """
         Object encapsulating a machine learning training job.
@@ -77,147 +78,185 @@ class TrainJob:
             online documentation (https://residentmario.github.io/fahr/index.html) for more
             information.
         """
-        filepath = pathlib.Path(filepath).absolute()
-        dirpath = filepath.parent
-        if not filepath.exists():
-            raise ValueError('The training artifact points to a non-existent file.')
-        if filepath.suffix != '.ipynb' and filepath.suffix != '.py':
-            raise NotImplementedError(
-                'Currently only Jupyter notebooks and Python scripts are supported.'
-            )
-        if build_driver != 'local' and build_driver != 'local-gpu':
-            raise NotImplementedError('Currently only local Docker builds are supported.')
-
-        # Check driver-specific configuration requirements
-        if train_driver == 'sagemaker':
-            if (config is None or
-                'output_path' not in config or
-                not config['output_path'].startswith('s3://')):
-                raise ValueError('The SageMaker driver requires an output_path to "s3://".')
-
-            if 'role_name' not in config:
-                raise ValueError('The SageMaker driver requires a role name.')
-
-            # Ensure that the job name is always a valid ARN name
-            tag = f'{dirpath.stem}/{filepath.stem}'.replace("/", "-").replace("_", "-")
-            regex = '^[a-zA-Z0-9](-*[a-zA-Z0-9])*'
-            try:
-                assert re.match(regex, tag).span()[1] == len(tag)
-            except (AssertionError, AttributeError):
-                raise ValueError(f'"File name must satisfy regex "{regex}".')
-
-        elif train_driver == 'kaggle':
-            if config is None or 'username' not in config:
-                raise ValueError('The Kaggle driver requires a username.')
-
-            # Ensure that the job name is always a valid kernel name
-            filename = f'{filepath.stem}'.replace("/", "-").replace("_", "-")
-            regex = '^[a-zA-Z0-9]{5,}'
-            try:
-                re.match(regex, filename).span()[1] == len(filename)
-            except (AssertionError, AttributeError):
-                raise ValueError(f'"File name must satisfy regex "{regex}".')
-
-            tag = f'{config["username"]}/{filename}'
-
-            # Ensure that the input sources are valid.
-            for source_param in ['dataset_sources', 'kernel_sources', 'competition_sources']:
-                if source_param in config:
-                    source_val = config[source_param]
-                    try:
-                        parsed_source_val = ast.literal_eval(source_val)
-                        assert isinstance(parsed_source_val, list)
-                        config[source_param] = parsed_source_val
-                    except (ValueError, AssertionError):
-                        raise ValueError(
-                            f'Invalid input for "{source_param}": "{config[source_param]}" '
-                            f'is not a list.'
-                        )
-
-            # Ensure that the input source actually exist.
-            for dataset in config.get('dataset_sources', []):
-                if subprocess.run(
-                    ["kaggle", "datasets", "status", dataset],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT
-                ).returncode != 0:
-                    raise ValueError(
-                        f'Invalid input: the dataset "{dataset}" does not exist.'
-                    )
-            for kernel in config.get('kernel_sources', []):
-                if subprocess.run(
-                    ["kaggle", "kernels", "status", kernel],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT
-                ).returncode != 0:
-                    raise ValueError(
-                        f'Invalid input: the kernel "{dataset}" does not exist.'
-                    )
-
-            if 'competition_sources' in config:
-                current_competitions = str(subprocess.check_output(
-                    ["kaggle", "competitions", "list"],
-                    stderr=subprocess.STDOUT
-                ))
-                for competition in config.get('competition_sources'):
-                    if competition not in current_competitions:
-                        raise ValueError(
-                            f'Invalid input: the competition "{competition}" does not exist '
-                            f'or is not currently running.'
-                        )
-
-        else:
-            raise NotImplementedError(
-                'Currently only AWS SageMaker and Kaggle Kernels are supported.'
-            )
-
-        if train_driver != 'kaggle':
-            if envfile:
-                envfile = pathlib.Path(envfile)
-                if envfile.name != 'requirements.txt':
-                    raise ValueError(
-                        '"envfile" must point to "requirements.txt" file'
-                    )
-            else:
-                envfile = dirpath / 'requirements.txt'
-            if not envfile.exists():
-                raise ValueError('No requirements.txt present and no "envfile" specified.')
-
-            logger.info(f'Using "{envfile}" as envfile.')
-
-            envfile = envfile.absolute().relative_to(pathlib.Path.cwd()).as_posix()
-            dockerfile, runfile = create_resources(
-                build_driver, train_driver, dirpath, filepath, envfile, overwrite
-            )
-        else:  # train_driver == 'kaggle':
-            # Kaggle kernels run in a default environment. The web UI allows you to 
-            # specify custom packages but the API does not currently support this feature.
-            if envfile:
-                raise ValueError(
-                    'The "envfile" parameter is specified but shouldn\'t be.'
-                    'Kaggle does not currently support running code in custom containers'
-                    'in the API.'
+        if job_name is None and filepath is None:
+            raise ValueError('One of "job_name" or "filepath" is required.')
+        if job_name is not None and filepath is not None:
+            raise ValueError('Cannot specify both "job_name" and "filepath".')
+        elif job_name is not None:
+            self.build_driver = build_driver
+            self.train_driver = train_driver
+            self.status = 'complete'
+            self.job_name = job_name
+        else:  # filepath is not None
+            filepath = pathlib.Path(filepath).absolute()
+            dirpath = filepath.parent
+            if not filepath.exists():
+                raise ValueError('The training artifact points to a non-existent file.')
+            if filepath.suffix != '.ipynb' and filepath.suffix != '.py':
+                raise NotImplementedError(
+                    'Currently only Jupyter notebooks and Python scripts are supported.'
                 )
-            create_kaggle_resources(
-                dirpath, filepath, tag,
-                title=config.pop('title', filename.replace('_', ' ').replace('-', ' ').title()),
-                is_private=config.pop('is_private', False),
-                enable_gpu=config.pop('enable_gpu', False),
-                enable_internet=config.pop('enable_internet', False),
-                dataset_sources=config.pop('dataset_sources', []),
-                kernel_sources=config.pop('kernel_sources', []),
-                competition_sources=config.pop('competition_sources', []),
-            )
+            if build_driver != 'local' and build_driver != 'local-gpu':
+                raise NotImplementedError('Currently only local Docker builds are supported.')
 
-        self.dirpath = dirpath
-        self.filepath = filepath
-        self.build_driver = build_driver
-        self.train_driver = train_driver
-        self.config = config
-        self.tag = tag
+            # Check driver-specific configuration requirements
+            if train_driver == 'sagemaker':
+                if (config is None or
+                    'output_path' not in config or
+                    not config['output_path'].startswith('s3://')):
+                    raise ValueError('The SageMaker driver requires an output_path to "s3://".')
 
-        if train_driver != 'kaggle':
+                if 'role_name' not in config:
+                    raise ValueError('The SageMaker driver requires a role name.')
+
+                # Ensure that the job name is always a valid ARN name
+                tag = f'{dirpath.stem}/{filepath.stem}'.replace("/", "-").replace("_", "-")
+                regex = '^[a-zA-Z0-9](-*[a-zA-Z0-9])*'
+                try:
+                    assert re.match(regex, tag).span()[1] == len(tag)
+                except (AssertionError, AttributeError):
+                    raise ValueError(f'"File name must satisfy regex "{regex}".')
+
+            elif train_driver == 'kaggle':
+                if config is None or 'username' not in config:
+                    raise ValueError('The Kaggle driver requires a username.')
+
+                # Ensure that the job name is always a valid kernel name
+                filename = f'{filepath.stem}'.replace("/", "-").replace("_", "-")
+                regex = '^[a-zA-Z0-9]{5,}'
+                try:
+                    re.match(regex, filename).span()[1] == len(filename)
+                except (AssertionError, AttributeError):
+                    raise ValueError(f'"File name must satisfy regex "{regex}".')
+
+                tag = f'{config["username"]}/{filename}'
+
+                # Ensure that the input sources are valid.
+                for source_param in ['dataset_sources', 'kernel_sources', 'competition_sources']:
+                    if source_param in config:
+                        source_val = config[source_param]
+                        try:
+                            parsed_source_val = ast.literal_eval(source_val)
+                            assert isinstance(parsed_source_val, list)
+                            config[source_param] = parsed_source_val
+                        except (ValueError, AssertionError):
+                            raise ValueError(
+                                f'Invalid input for "{source_param}": "{config[source_param]}" '
+                                f'is not a list.'
+                            )
+
+                # Ensure that the input source actually exist.
+                for dataset in config.get('dataset_sources', []):
+                    if subprocess.run(
+                        ["kaggle", "datasets", "status", dataset],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT
+                    ).returncode != 0:
+                        raise ValueError(
+                            f'Invalid input: the dataset "{dataset}" does not exist.'
+                        )
+                for kernel in config.get('kernel_sources', []):
+                    if subprocess.run(
+                        ["kaggle", "kernels", "status", kernel],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT
+                    ).returncode != 0:
+                        raise ValueError(
+                            f'Invalid input: the kernel "{dataset}" does not exist.'
+                        )
+
+                if 'competition_sources' in config:
+                    current_competitions = str(subprocess.check_output(
+                        ["kaggle", "competitions", "list"],
+                        stderr=subprocess.STDOUT
+                    ))
+                    for competition in config.get('competition_sources'):
+                        if competition not in current_competitions:
+                            raise ValueError(
+                                f'Invalid input: the competition "{competition}" does not exist '
+                                f'or is not currently running.'
+                            )
+
+            else:
+                raise NotImplementedError(
+                    'Currently only AWS SageMaker and Kaggle Kernels are supported.'
+                )
+
+            if envfile is None:
+                default_envfile = dirpath / 'requirements.txt'
+                if not default_envfile.exists():
+                    logger.info(
+                        f'No "requirements.txt" included in the model definition directory. '
+                        f'Using the default environment.')
+                    envfile = None
+                else:
+                    logger.info(f'Using "{default_envfile}" as the environment definition file.')
+                    envfile = default_envfile
+            else:
+                envfile = pathlib.Path(envfile)
+                if not envfile.exists():
+                    raise ValueError(
+                        f'Cannot set "envfile" to non-existent file {envfile.as_posix()}.'
+                    )
+                if not envfile.name == 'requirements.txt':
+                    raise ValueError(
+                        'Currently only environment definition files of the "requirements.txt" '
+                        'type are supported.'
+                    )
+                logger.info(f'Using "{envfile}" as the environment definition file.')
+                envfile = envfile.absolute().relative_to(pathlib.Path.cwd()).as_posix()
+
+            if train_driver == 'sagemaker':
+                dockerfile, runfile = create_sagemaker_resources(
+                    build_driver, train_driver, dirpath, filepath, envfile, overwrite
+                )
+            else:  # train_driver == 'kaggle':
+                # Kaggle kernels run in a default environment. The web UI allows you to 
+                # specify custom packages but the API does not currently support this feature.
+                if envfile is not None:
+                    logger.warning(
+                        'An environment definition file is provided, but the Kaggle training '
+                        'driver is currently in use. Kaggle does not currently support running '
+                        'code in custom containers in the API. The default environment will be '
+                        'used instead.'
+                    )
+                dockerfile, runfile = create_kaggle_resources(
+                    dirpath, filepath, tag,
+                    title=config.pop(
+                        'title', filename.replace('_', ' ').replace('-', ' ').title()
+                    ),
+                    is_private=config.pop('is_private', False),
+                    enable_gpu=config.pop('enable_gpu', False),
+                    enable_internet=config.pop('enable_internet', False),
+                    dataset_sources=config.pop('dataset_sources', []),
+                    kernel_sources=config.pop('kernel_sources', []),
+                    competition_sources=config.pop('competition_sources', []),
+                )
+
+            self.dirpath = dirpath
+            self.filepath = filepath
+            self.build_driver = build_driver
+            self.train_driver = train_driver
+            self.config = config
+            self.tag = tag
             self.dockerfile = dockerfile
             self.runfile = runfile
+            self.status = 'unlaunched'
             self.docker_client = docker.client.from_env()
+
+    @classmethod
+    def from_model_definition(
+        cls, filepath, build_driver='local', train_driver='sagemaker',
+        envfile=None, overwrite=False, config=None
+    ):
+        return cls(
+            filepath=filepath, build_driver=build_driver, train_driver=train_driver,
+            envfile=envfile, overwrite=overwrite, config=config
+        )
+
+    @classmethod
+    def from_training_job(cls, job_name, train_driver='sagemaker', config=None):
+        return cls(
+            job_name=job_name, train_driver=train_driver, config=config
+        )
 
     def build(self):
         """
@@ -329,7 +368,7 @@ class TrainJob:
                     RoleSessionName='fahr_session'
                 )['Credentials']
                 aws_access_key_id, aws_secret_access_key, aws_session_token = (
-                    auth['AccessKeyId'], auth['AccessKeyId'], auth['SessionToken']
+                    auth['AccessKeyId'], auth['SecretAccessKey'], auth['SessionToken']
                 )
 
             assumed_role_session = boto3.session.Session(
@@ -382,6 +421,7 @@ class TrainJob:
                 f'To download finished model artifacts run {download_cmd} after '
                 f'training is complete.'
             )
+            self.status = 'submitted'
 
         elif self.train_driver == 'kaggle':
             logger.info(
@@ -400,6 +440,8 @@ class TrainJob:
                 f'To download finished model artifacts run {download_cmd} after '
                 f'training is complete.'
             )
+            self.job_name = self.tag
+            self.status = 'submitted'
 
         else:
             raise NotImplementedError
@@ -424,15 +466,51 @@ class TrainJob:
         ------
         ValueError -- Raised if you attempt to `fetch` without first running `fit`.
         """
-        if not hasattr(self, 'job_name'):
+        if self.status == 'unlaunched':
             raise ValueError('Cannot fetch TrainJob model artifacts without fitting first.')
+        
+        # Validate path.
+        local_path = pathlib.Path(local_path)
+        if not local_path.exists():
+            raise ValueError("'local_path' must point to an existing directory.")
+        if not local_path.is_dir():
+            raise ValueError("'local_path' must point to a directory.")
 
-        # If the Kaggle driver is used, output_path is None.
-        output_path = self.config.get('output_path', None)
-        return fetch(
-            local_path, self.tag, remote_path=output_path, train_driver=self.train_driver,
-            extract=extract, job_name=self.job_name
-        )
+        if self.train_driver == 'sagemaker':
+            import boto3
+
+            # previous_jobs = get_previous_jobs(self.tag)
+            sagemaker = boto3.client('sagemaker')
+            job_info = sagemaker.describe_training_job(TrainingJobName=self.job_name)
+            remote_path = job_info['ModelArtifacts']['S3ModelArtifacts']
+
+            remote_path_name_parts = remote_path.replace('s3://', '').split('/')
+            bucket_name = remote_path_name_parts[0]
+            # '1:' to exclude the bucket name part, and ':-3' to exclude the path fragment
+            # SageMaker adds: /{job_name}/output/model.tar.gz, to get just the part in between
+            bucket_path = '/'.join(remote_path_name_parts[1:-3])
+
+            model_path = f'{bucket_path}/{self.job_name}/output/model.tar.gz'.lstrip('/')
+            local_model_filepath = pathlib.Path(f'{local_path}/model.tar.gz').absolute()
+            local_model_filepath_str = local_model_filepath.as_posix()
+            local_model_directory_str = f'{local_model_filepath.parent.as_posix()}/'
+
+            s3_client = boto3.client('s3')
+            s3_client.download_file(bucket_name, model_path, local_model_filepath_str)
+
+            if extract:
+                tarfile.open(local_model_filepath_str).extractall()
+                pathlib.Path(local_model_filepath_str).unlink()
+                logger.info(f'Downloaded model artifact(s) to "{local_model_directory_str}".')
+            else:
+                logger.info(f'Downloaded model artifact(s) to "{local_model_filepath_str}".')
+
+        elif self.train_driver == 'kaggle':
+            subprocess.run(
+                ["kaggle", "kernels", "output", self.job_name, "-p", local_path],
+                stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT
+            )
+            logger.info(f'Downloaded model artifact(s) to "{local_path}".')
 
     def fit(self):
         """
@@ -450,69 +528,6 @@ class TrainJob:
         self.build()
         self.push()
         self.train()
-
-
-def fetch(local_path, tag, remote_path, train_driver='sagemaker', extract=False, job_name=None):
-    """
-    Extracts model artifacts generated by a prior `TrainingJob` to `local_path`.
-
-    Used by `TrainingJob.fetch` and by the CLI.
-
-    Parameters
-    ----------
-    local_path: str or pathlib.Path
-        Directory to write the model artifact to.
-    tag: str
-        The tag of the 
-    remote_path: str
-        The root directory that the model artifact got written to.
-        This should be the same as the `config.output_path` of the `TrainingJob` that generated
-        this model artifact.
-    train_driver: str
-        The train_driver (service) that will perform the training. Cf. the `TrainJob` docstring.
-    extract: bool, default True
-        Whether or not to untar the data on arrival.
-    job_name: str or None
-        The name of the job used to generate the model artifact. If omitted, the most recent model
-        artifact associated with the given `tag` will be downloaded. If included, the model artifact
-        associated with this specific job will be downloaded.
-
-        This parameter is primarily intended for use by the `TrainJob.fetch` object method.
-    """
-    # TODO: remote_path or output_path? Standardize name.
-    if train_driver == 'sagemaker':
-        import boto3
-
-        path = validate_path(local_path)
-        job_name = job_name if job_name is not None else get_previous_job_name(tag)
-        output_dir = remote_path
-        bucket_name = output_dir.replace('s3://', '').split('/')[0]
-        bucket_path = '/'.join(output_dir.replace('s3://', '').split('/')[1:])
-        model_path = f'{bucket_path}{job_name}/output/model.tar.gz'
-        local_model_filepath = pathlib.Path(f'{path}/model.tar.gz').absolute()
-        local_model_filepath_str = local_model_filepath.as_posix()
-        local_model_directory_str = f'{local_model_filepath.parent.as_posix()}/'
-
-        s3_client = boto3.client('s3')
-        s3_client.download_file(bucket_name, model_path, local_model_filepath_str)
-
-        if extract:
-            tarfile.open(local_model_filepath_str).extractall()
-            pathlib.Path(local_model_filepath_str).unlink()
-            logger.info(f'Downloaded model artifact(s) to "{local_model_directory_str}".')
-        else:
-            logger.info(f'Downloaded model artifact(s) to "{local_model_filepath_str}".')
-
-    elif train_driver == 'kaggle':
-        path = validate_path(local_path)
-        subprocess.run(
-            ["kaggle", "kernels", "output", tag, "-p", local_path],
-            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT
-        )
-        logger.info(f'Downloaded model artifact(s) to "{local_path}".')
-
-    else:
-        raise NotImplementedError
 
 
 def copy_resources(src, dest, overwrite=True, training_artifact=None):
@@ -626,7 +641,7 @@ def create_runfile(build_driver, train_driver, dirpath, filepath):
         raise NotImplementedError
 
 
-def create_resources(build_driver, train_driver, dirpath, filepath, envfile, overwrite):
+def create_sagemaker_resources(build_driver, train_driver, dirpath, filepath, envfile, overwrite):
     """
     Creates file resources that will be used by this library in a target directory 
     (specifically, a Dockerfile and a run.sh entrypoint). Calls `create_runfile` and
@@ -730,6 +745,10 @@ def create_kaggle_resources(
     logger.info(f'Writing kernel metadata to "{kernel_metadata_filepath}".')
     with open(kernel_metadata_filepath, 'w') as fp:
         json.dump(kernel_metadata, fp)
+    
+    # The other create_*_resources methods return a (Dockerfile, runfile) tuple. Since Kaggle
+    # does not make use of these assets, we return a (None, None) instead here.
+    return None, None
 
 
 def get_repository_info(session, tag, sts_client):
@@ -743,7 +762,7 @@ def get_repository_info(session, tag, sts_client):
     return region, account_id, repository
 
 
-def get_previous_job_name(tag):
+def get_previous_jobs(tag):
     """
     Given the training run tag, determine the name of the job immediately previous to this
     one, assuming one exists. SageMaker only.
@@ -755,6 +774,12 @@ def get_previous_job_name(tag):
     finished_jobs = sagemaker_client.list_training_jobs()['TrainingJobSummaries']
     prefix = f'fahr-{tag.replace("/", "-").replace("_", "-")}'
     previous_jobs = [j for j in finished_jobs if j['TrainingJobName'].startswith(prefix)]
+    return previous_jobs
+
+
+def get_previous_job_name(tag):
+    previous_jobs = get_previous_jobs(tag)
+    prefix = f'fahr-{tag.replace("/", "-").replace("_", "-")}'
     return f'{prefix}-{len(previous_jobs)}' if previous_jobs else None
 
 
@@ -773,16 +798,4 @@ def get_next_job_name(tag):
         return f'fahr-{tag}-1'
 
 
-def validate_path(path):
-    """
-    Checks that a path exists and is a directory.
-    """
-    path = pathlib.Path(path)
-    if not path.exists():
-        raise ValueError("Output parameter must point to an existing directory.")
-    if not path.is_dir():
-        raise ValueError("Output path must be a directory.")
-    return path
-
-
-__all__ = ['TrainJob', 'fetch', 'copy_resources']
+__all__ = ['TrainJob', 'copy_resources']

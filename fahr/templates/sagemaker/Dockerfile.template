@@ -9,9 +9,11 @@ RUN mkdir app
 WORKDIR app
 
 
+{% if envfile is not none -%}
 # install code dependencies
 COPY {{ envfile }} requirements.txt
 RUN pip install -r requirements.txt
+{% endif -%}
 
 
 # install environment dependencies

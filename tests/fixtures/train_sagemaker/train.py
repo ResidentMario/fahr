@@ -31,7 +31,14 @@ clf.fit(X_train, y_train, epochs=20, batch_size=128)
 y_test_pred = clf.predict(X_test)
 
 # print a score
-print(f'Achieved accuracy score of {(y_test_pred.argmax(axis=1) == y_test.argmax(axis=1)).sum() / len(y_test)}.')
+print(
+    f'Achieved accuracy score of '
+    f'{(y_test_pred.argmax(axis=1) == y_test.argmax(axis=1)).sum() / len(y_test)}.'
+)
 
 # save a model artifact
-clf.save("model.h5")
+import os
+if os.environ.get('FAHR_EXECUTION_ENVIRONMENT') == 'sagemaker':
+    clf.save('/opt/ml/model/model.h5')
+else:
+    clf.save('model.h5')

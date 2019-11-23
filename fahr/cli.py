@@ -1,6 +1,5 @@
 import click
 from .fahr import TrainJob
-from .fahr import fetch as _fetch
 from .fahr import copy_resources
 
 @click.group()
@@ -43,7 +42,7 @@ def fmt_ctx(ctx):
 def fit(ctx, training_artifact_path, train_driver, build_driver, envfile, overwrite):
     config = fmt_ctx(ctx)
     j = TrainJob(
-        training_artifact_path, build_driver=build_driver, train_driver=train_driver,
+        filepath=training_artifact_path, build_driver=build_driver, train_driver=train_driver,
         overwrite=overwrite, config=config
     )
     j.fit()
@@ -53,20 +52,21 @@ def fit(ctx, training_artifact_path, train_driver, build_driver, envfile, overwr
 def init(ctx, training_artifact_path, train_driver, build_driver, envfile, overwrite):
     config = fmt_ctx(ctx)
     TrainJob(
-        training_artifact_path, build_driver=build_driver, train_driver=train_driver,
+        filepath=training_artifact_path, build_driver=build_driver, train_driver=train_driver,
         overwrite=overwrite, config=config
     )
 
 
 @click.command(name='fetch')
 @click.argument('local_path')
-@click.argument('tag')
+@click.argument('job_name')
 @click.argument('remote_path', required=False)
 @click.option('--train-driver', default='sagemaker', help='Driver to be used for running the train job.')
 @click.option('--no-extract', default=False, is_flag=True,
     help='Don\'t extract the data on arrival.')
-def fetch(local_path, tag, remote_path, driver, no_extract):
-    _fetch(local_path, tag, remote_path, train_driver=driver, extract=not no_extract)
+def fetch(local_path, job_name, remote_path, train_driver, no_extract):
+    j = TrainJob(job_name=job_name, train_driver=train_driver)
+    j.fetch(local_path, extract=not no_extract)
 
 
 @click.command(name='copy')

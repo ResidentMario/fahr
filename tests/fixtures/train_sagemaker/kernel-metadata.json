@@ -1,0 +1,1 @@
+{"id": "TestUser/train", "title": "Train", "code_file": "/Users/alex/Desktop/fahr/tests/fixtures/train_sagemaker/train.py", "language": "python", "kernel_type": "script", "is_private": false, "enable_gpu": false, "enable_internet": false, "dataset_sources": [], "competition_sources": [], "kernel_sources": []}

@@ -11,6 +11,7 @@ setup(
         'all': ['boto3', 'sagemaker', 'kaggle'],
         # develop is all addtl packages plus dev stuff
         'develop': [
+            'pytest', 'pytest-socket',  # testing
             'sphinx', 'sphinx_rtd_theme',  # docs
             'boto3', 'sagemaker',  # sagemaker
             'kaggle'  # kaggle
