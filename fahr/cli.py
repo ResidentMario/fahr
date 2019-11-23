@@ -57,11 +57,24 @@ def init(ctx, training_artifact_path, train_driver, build_driver, envfile, overw
     )
 
 
+@click.command(name='status')
+@click.argument('job_name')
+@click.option('--train-driver', default='sagemaker',
+    help='Driver to be used for running the train job.')
+def status(job_name, train_driver):
+    j = TrainJob(job_name=job_name, train_driver=train_driver)
+    print(
+        f'Training job {job_name!r} run on the {train_driver!r} service has '
+        f'status {j.status()}.'
+    )
+
+
 @click.command(name='fetch')
 @click.argument('local_path')
 @click.argument('job_name')
 @click.argument('remote_path', required=False)
-@click.option('--train-driver', default='sagemaker', help='Driver to be used for running the train job.')
+@click.option('--train-driver', default='sagemaker',
+    help='Driver to be used for running the train job.')
 @click.option('--no-extract', default=False, is_flag=True,
     help='Don\'t extract the data on arrival.')
 def fetch(local_path, job_name, remote_path, train_driver, no_extract):
@@ -87,9 +100,10 @@ def copy(src, dest, overwrite, include_training_artifact):
 
 
 cli.add_command(fit)
+cli.add_command(status)
 cli.add_command(fetch)
 cli.add_command(init)
 cli.add_command(copy)
 
 
-__all__ = ['fit', 'fetch', 'init', 'copy']
+__all__ = ['fit', 'status', 'fetch', 'init', 'copy']

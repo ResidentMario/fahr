@@ -85,8 +85,10 @@ class TrainJob:
         elif job_name is not None:
             self.build_driver = build_driver
             self.train_driver = train_driver
-            self.status = 'complete'
             self.job_name = job_name
+
+            self._latest_status = 'submitted'
+            self.status()
         else:  # filepath is not None
             filepath = pathlib.Path(filepath).absolute()
             dirpath = filepath.parent
@@ -231,6 +233,17 @@ class TrainJob:
                     competition_sources=config.pop('competition_sources', []),
                 )
 
+            # The _latest_status internal prop tracks the most recent job status known by the
+            # class. If the job is initialized from a local file, but not launched, it will be
+            # set to 'unlaunched'. If the job has been launched, but never checked, it will be
+            # 'submitted'. If the job has been launched, been checked, and the check shows that
+            # the job is finished, it will be 'complete' or 'failed', depending on the job's
+            # outcome.
+            #
+            # The status method is a public quasi-property (actually a method, as performing a
+            # network request on a property is disingenous) which abstracts over this property.
+            self._latest_status = 'unlaunched'
+
             self.dirpath = dirpath
             self.filepath = filepath
             self.build_driver = build_driver
@@ -239,8 +252,58 @@ class TrainJob:
             self.tag = tag
             self.dockerfile = dockerfile
             self.runfile = runfile
-            self.status = 'unlaunched'
             self.docker_client = docker.client.from_env()
+
+    def status(self):
+        if self._latest_status == 'unlaunched':
+            return 'unlaunched'
+        elif self._latest_status == 'submitted':
+            if self.train_driver == 'sagemaker':
+                job_info = get_sagemaker_job_info(self.job_name)
+                online_status = job_info['TrainingJobStatus']
+                # TODO: is an 'interrupted' status appropriate?
+                if online_status in ['InProgress', 'Stopping', 'Stopped']:
+                    return 'submitted'
+                elif online_status == 'Completed':
+                    self._latest_status = 'complete'
+                    return 'complete'
+                elif online_status == 'Failed':
+                    return 'failed'
+                else:
+                    raise ValueError(
+                        f'Checking the status of the SageMaker job returned unexpected status '
+                        f'value {online_status}, indicating a possible schema change. Please '
+                        f'file an issue on GitHub with a traceback.'
+                    )
+            else:  # self.train_driver == 'kaggle'
+                online_status = subprocess.check_output(
+                    ["kaggle", "kernels", "status", self.job_name]
+                ).decode('utf-8')
+                sentinel = f'{self.job_name} has status '
+                if not sentinel in online_status:
+                    raise ValueError(
+                        f'Checking the status of the Kaggle job returned unexpected status '
+                        f'value {online_status!r}, indicating a possible schema change. Please '
+                        f'file an issue on GitHub with a traceback.'
+                    )
+                l = online_status.find(sentinel)
+                l += len(sentinel) + 1
+                r = online_status.find('"', l)
+                online_status = online_status[l:r]
+
+                if online_status == 'complete':
+                    # Note that 'complete' only means that the job runner did not throw an error,
+                    # e.g. every code cell ran or the script finished execution. The notebook or
+                    # script could have itself failed; this is still reported as a 'complete' by
+                    # the Kaggle API.
+                    self._latest_status = 'complete'
+                    return 'complete'
+                elif online_status == 'running':
+                    return 'submitted'
+                elif online_status == 'failed':
+                    return 'failed'
+        else:  # self._latest_status in ['complete', 'failed']
+            return self._latest_status
 
     @classmethod
     def from_model_definition(
@@ -421,7 +484,7 @@ class TrainJob:
                 f'To download finished model artifacts run {download_cmd} after '
                 f'training is complete.'
             )
-            self.status = 'submitted'
+            self._latest_status = 'submitted'
 
         elif self.train_driver == 'kaggle':
             logger.info(
@@ -441,7 +504,7 @@ class TrainJob:
                 f'training is complete.'
             )
             self.job_name = self.tag
-            self.status = 'submitted'
+            self._latest_status = 'submitted'
 
         else:
             raise NotImplementedError
@@ -466,7 +529,7 @@ class TrainJob:
         ------
         ValueError -- Raised if you attempt to `fetch` without first running `fit`.
         """
-        if self.status == 'unlaunched':
+        if self.status() == 'unlaunched':
             raise ValueError('Cannot fetch TrainJob model artifacts without fitting first.')
         
         # Validate path.
@@ -477,11 +540,7 @@ class TrainJob:
             raise ValueError("'local_path' must point to a directory.")
 
         if self.train_driver == 'sagemaker':
-            import boto3
-
-            # previous_jobs = get_previous_jobs(self.tag)
-            sagemaker = boto3.client('sagemaker')
-            job_info = sagemaker.describe_training_job(TrainingJobName=self.job_name)
+            job_info = get_sagemaker_job_info(self.job_name)
             remote_path = job_info['ModelArtifacts']['S3ModelArtifacts']
 
             remote_path_name_parts = remote_path.replace('s3://', '').split('/')
@@ -495,6 +554,7 @@ class TrainJob:
             local_model_filepath_str = local_model_filepath.as_posix()
             local_model_directory_str = f'{local_model_filepath.parent.as_posix()}/'
 
+            import boto3
             s3_client = boto3.client('s3')
             s3_client.download_file(bucket_name, model_path, local_model_filepath_str)
 
@@ -796,6 +856,12 @@ def get_next_job_name(tag):
         return f'{previous_job_name[:-1]}{str(next_job_num)}'
     else:
         return f'fahr-{tag}-1'
+
+
+def get_sagemaker_job_info(job_name):
+    import boto3
+    sagemaker = boto3.client('sagemaker')
+    return sagemaker.describe_training_job(TrainingJobName=job_name)
 
 
 __all__ = ['TrainJob', 'copy_resources']

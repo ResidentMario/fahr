@@ -111,6 +111,7 @@ class TestTrainJobInit(unittest.TestCase):
         assert j.filepath == FILEPATH
         assert j.train_driver == 'sagemaker'
         assert j.tag == 'train-sagemaker-train'
+        assert j.status() == 'unlaunched'
 
     def test_sagemaker_init_invalid_no_output_path(self):
         kwargs = deepcopy(sagemaker_kwargs)
@@ -134,9 +135,9 @@ class TestTrainJobInit(unittest.TestCase):
             TrainJob(filepath=FILEPATH, **kwargs)
 
     def test_valid_init_from_job(self):
-        j = TrainJob(job_name='TestUser/train-simple-train', **kaggle_kwargs)
-        assert j.job_name == 'TestUser/train-simple-train'
-        assert j.status == 'complete'
+        with patch('fahr.fahr.TrainJob.status', new = lambda self: 'complete'):
+            j = TrainJob(job_name='TestUser/train-simple-train', **kaggle_kwargs)
+            assert j.job_name == 'TestUser/train-simple-train'
 
 class TestTrainJobBuild(unittest.TestCase):
     """
@@ -339,7 +340,6 @@ class TestTrainJobSagemakerTrain(unittest.TestCase):
             estimator_mock.return_value.fit.assert_called_once_with(
                 job_name='fahr-train-simple-train-1', wait=False
             )
-            assert j.status == 'submitted'
 
 
 def test_kaggle_train():
@@ -356,7 +356,6 @@ def test_kaggle_train():
             ["kaggle", "kernels", "push", "-p", FILEPATH.parent.as_posix()],
             stderr=ANY, stdout=ANY
         )
-        assert j.status == 'submitted'
 
 
 def test_kaggle_fetch():
@@ -365,6 +364,7 @@ def test_kaggle_fetch():
     """
     with patch('subprocess.run') as run_mock, \
         patch('fahr.fahr.create_kaggle_resources', new=create_resources_mock), \
+        patch('fahr.fahr.TrainJob.status', new=lambda self: 'complete'), \
         warnings.catch_warnings():
         warnings.simplefilter('ignore')
         j = TrainJob(filepath=FILEPATH, **kaggle_kwargs)
@@ -443,7 +443,7 @@ class TestTrainJobSagemakerFetch(unittest.TestCase):
             patch('fahr.fahr.get_previous_jobs', new=get_previous_jobs_mock):
             j = TrainJob(filepath=FILEPATH, **sagemaker_kwargs)
             j.job_name = 'train-simple-train-1'
-            j.status = 'complete'
+            j._latest_status = 'complete'
             j.fetch('./', extract=False)
             self.download_file_mock.assert_called_once_with(
                 'nonexistent-bucket',
@@ -581,3 +581,69 @@ def test_get_next_job_name():
     with patch('fahr.fahr.get_previous_job_name', return_value='fahr-train-simple-train-1'):
         result = fahr.fahr.get_next_job_name('train-simple-train')
     assert expected == result
+
+
+class TestStatus(unittest.TestCase):
+    """
+    Test the TrainJob status method.
+    """
+    def setUp(self):
+        def check_output_mock_complete(_):
+            return b'TestUser/train has status "complete"\n'
+        self.check_output_mock_complete = check_output_mock_complete
+
+        def check_output_mock_failed(_):
+            return b'TestUser/train has status "failed"\n'
+        self.check_output_mock_failed = check_output_mock_failed
+
+        def check_output_mock_in_progress(_):
+            return b'TestUser/train has status "running"\n'
+        self.check_output_mock_in_progress = check_output_mock_in_progress
+
+    def test_status_kaggle_from_file(self):
+        with patch('fahr.fahr.create_kaggle_resources', new=create_resources_mock), \
+        warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            j = TrainJob(filepath=FILEPATH, **kaggle_kwargs)
+            assert j.status() == 'unlaunched'
+
+    def test_status_kaggle_from_job(self):
+        with patch('fahr.fahr.create_kaggle_resources', new=create_resources_mock), \
+        warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+
+            with patch('subprocess.check_output', new=self.check_output_mock_complete):
+                j = TrainJob(job_name='TestUser/train', train_driver='kaggle')
+                assert j.status() == 'complete'
+
+            with patch('subprocess.check_output', new=self.check_output_mock_failed):
+                j = TrainJob(job_name='TestUser/train', train_driver='kaggle')
+                assert j.status() == 'failed'
+
+            with patch('subprocess.check_output', new=self.check_output_mock_in_progress):
+                j = TrainJob(job_name='TestUser/train', train_driver='kaggle')
+                assert j.status() == 'submitted'
+
+    def test_status_sagemaker_from_file(self):
+        with patch('fahr.fahr.create_sagemaker_resources', new=create_resources_mock):
+            j = TrainJob(filepath=FILEPATH, **sagemaker_kwargs)
+            assert j.status() == 'unlaunched'
+
+    def test_status_sagemaker_from_job(self):
+        with patch('fahr.fahr.get_sagemaker_job_info', return_value={
+            'TrainingJobName': 'fahr-train-simple-train-1', 'TrainingJobStatus': 'Completed'
+        }):
+            j = TrainJob(job_name='fahr-train-simple-train-1', train_driver='sagemaker')
+            assert j.status() == 'complete'
+
+        with patch('fahr.fahr.get_sagemaker_job_info', return_value={
+            'TrainingJobName': 'fahr-train-simple-train-1', 'TrainingJobStatus': 'Failed'
+        }):
+            j = TrainJob(job_name='fahr-train-simple-train-1', train_driver='sagemaker')
+            assert j.status() == 'failed'
+
+        with patch('fahr.fahr.get_sagemaker_job_info', return_value={
+            'TrainingJobName': 'fahr-train-simple-train-1', 'TrainingJobStatus': 'InProgress'
+        }):
+            j = TrainJob(job_name='fahr-train-simple-train-1', train_driver='sagemaker')
+            assert j.status() == 'submitted'
