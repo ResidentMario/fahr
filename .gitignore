@@ -5,3 +5,7 @@ _build
 build/
 dist/
 .pytest_cache/
+tests/integration/Dockerfile
+tests/integration/requirements.txt
+tests/integration/kernel-metadata.json
+tests/integration/run.sh

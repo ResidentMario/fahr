@@ -224,7 +224,7 @@ class TrainJob:
                     envfile = None
                 else:
                     logger.info(f'Using "{default_envfile}" as the environment definition file.')
-                    envfile = default_envfile
+                    envfile = default_envfile.relative_to(pathlib.Path.cwd()).as_posix()
             else:
                 envfile = pathlib.Path(envfile)
                 if not envfile.exists():

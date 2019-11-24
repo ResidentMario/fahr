@@ -1,32 +1,45 @@
-{% if build_driver == 'default-cpu' -%}
-FROM python:latest
-{% elif build_driver == 'default-gpu' -%}
-FROM tensorflow/tensorflow:1.10.1-gpu-py3
+{% if train_image == 'default-cpu' -%}
+FROM python:3.7-slim AS compile-image
+{% elif train_image == 'default-gpu' -%}
+FROM tensorflow/tensorflow:1.10.1-gpu-py3 AS compile-image
 {% else %}
-FROM {{ build_driver }}
+FROM {{ train_image }} AS compile-image
 {% endif -%}
 
 # set the working directory
 RUN mkdir app
 WORKDIR app
 
-
 {% if envfile is not none -%}
+# configure installation environment
+RUN apt-get update
+RUN apt-get install -y --no-install-recommends build-essential gcc
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
 # install code dependencies
-COPY {{ envfile }} requirements.txt
+COPY {{ envfile }} .
 RUN pip install -r requirements.txt
 {% endif -%}
 
+{% if train_image == 'default-cpu' -%}
+FROM python:3.7-slim AS build-image
+{% elif train_image == 'default-gpu' -%}
+FROM tensorflow/tensorflow:1.10.1-gpu-py3 AS build-image
+{% else %}
+FROM {{ train_image }} AS build-image
+{% endif -%}
+COPY --from=compile-image /opt/venv /opt/venv
 
 # install environment dependencies
 COPY run.sh .
 COPY {{ filepath }} .
 ENV FAHR_EXECUTION_ENVIRONMENT sagemaker
-{% if build_driver != 'local-cpu' -%}
+ENV PATH="/opt/venv/bin:$PATH"
+{% if train_image != 'default-cpu' -%}
 ENV NVIDIA_VISIBLE_DEVICES all
 ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
 {% endif %}
-
 # provision environment
 RUN chmod +x ./run.sh
 EXPOSE 8080
