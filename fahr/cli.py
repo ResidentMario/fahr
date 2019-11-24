@@ -14,8 +14,8 @@ def fit_wrapper(func):
     @click.argument('training_artifact_path')
     @click.option('--train-driver', default='sagemaker',
         help='Driver to be used for running the train job.')
-    @click.option('--build-driver', default='local',
-        help='Driver to be used for building the model image.')
+    @click.option('--train-image', default='default-cpu',
+        help='Docker image to be used as the base of the runtime environment.')
     @click.option('--envfile', default=None, help='Code environment definition file to build with.')
     @click.option('--overwrite', is_flag=True, default=False,
         help='If true, overwrite existing training artifacts.')
@@ -39,20 +39,20 @@ def fmt_ctx(ctx):
 
 
 @fit_wrapper
-def fit(ctx, training_artifact_path, train_driver, build_driver, envfile, overwrite):
+def fit(ctx, training_artifact_path, train_driver, train_image, envfile, overwrite):
     config = fmt_ctx(ctx)
     j = TrainJob(
-        filepath=training_artifact_path, build_driver=build_driver, train_driver=train_driver,
+        filepath=training_artifact_path, train_image=train_image, train_driver=train_driver,
         overwrite=overwrite, config=config
     )
     j.fit()
 
 
 @fit_wrapper
-def init(ctx, training_artifact_path, train_driver, build_driver, envfile, overwrite):
+def init(ctx, training_artifact_path, train_driver, train_image, envfile, overwrite):
     config = fmt_ctx(ctx)
     TrainJob(
-        filepath=training_artifact_path, build_driver=build_driver, train_driver=train_driver,
+        filepath=training_artifact_path, train_image=train_image, train_driver=train_driver,
         overwrite=overwrite, config=config
     )
 

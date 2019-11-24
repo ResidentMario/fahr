@@ -25,7 +25,7 @@ if not logger.handlers:
 
 class TrainJob:
     def __init__(
-        self, filepath=None, job_name=None, build_driver='local', train_driver='sagemaker',
+        self, filepath=None, job_name=None, train_image='default-cpu', train_driver='sagemaker',
         envfile=None, overwrite=False, config=None
     ):
         """
@@ -38,19 +38,36 @@ class TrainJob:
             is an executable code object (currently either a Jupyter notebook or a Python script,
             plus optional supporting files), whose output is a model artifact (a serialized model,
             a saved weights matrix, etcetera).
-        build_driver: str
+
+            One of `filepath` or `job_name` is required. If `filepath` is provided, a `TrainJob`
+            instance with the `status` `"unlaunched"` is initialized.
+        job_name: str
+            If this parameter is provided, `TrainJob` will be initialized with this model training
+            job, adopting its `status` and model artifact output location. The job can then be used
+            to `fetch` this job's model artifacts.
+
+            One of `filepath` or `job_name` is required. See `job_name` under "Properties" for more
+            information.
+        train_image: str
+            This parameter controls the base image used for the Docker image in which training will
+            be performed.
+            
             The model definition (see `filepath`) is packaged into a Docker image before being sent
-            off to train, creating a model training image. The build driver controls which
-            service is used to perform this step. Currently the following options are supported:
+            off to train, creating a model training image. This operation is performed on your
+            local machine (in the future, a `train_driver` parameter may allow for performing this
+            step on remote compute). The following hard-coded images are provided:
 
-            * 'local' -- Builds the model container on your local machine without GPU.
-            * 'local-gpu' -- Builds the model container on your local machine with GPU support.
-              Note that this options requires a machine with a GPU onboard and nvidia-docker
-              (https://github.com/NVIDIA/nvidia-docker) installed.
+            * 'default-cpu' -- Builds the model container on your local machine without GPU, using
+              the `python:latest` Docker image.
+            * 'default-gpu' -- Builds the model container on your local machine with GPU support,
+               using the `tensorflow/tensorflow:1.10.1-gpu-py3` Docker image. Note that this option
+               requires a machine with a GPU onboard and nvidia-docker
+               (https://github.com/NVIDIA/nvidia-docker) installed.
 
-            Note: when using the Kaggle training driver, you are locked into the Docker image
-            provided by the default in the Kaggle kernels environment, and this parameter may be
-            left blank.
+            Alternatively, to specify a different base image, provide that image's tag as input.
+
+            Note that no `train_image` is necessary when using the Kaggle job runner, as Kaggle
+            does not provide the ability to adjust the runtime environment via the API.
         train_driver: str
             The training driver (service) is the compute platform that performs the training
             (executes the model training image). Currently the following options are supported:
@@ -75,15 +92,24 @@ class TrainJob:
         config: dict
             A dict of driver-specific configuration variables used to inform how the job is run.
             The precise list of configuration options differs from driver to driver. See the
-            online documentation (https://residentmario.github.io/fahr/index.html) for more
-            information.
+            User Reference (https://residentmario.github.io/fahr/index.html) for more information.
+        
+        Properties
+        ----------
+        tag: str
+            The tag associated with this job. For example, a `TrainJob` initialized with the
+            `32_16_cnn.py` artifact in the `imagenet` folder might be given the `tag`
+            `imagenet-32-16-cnn`.
+        job_name: str
+            The job's name. This property will not be available until `fit` has been called.
+            The job name is closely linked to the tag, e.g. the above.
         """
         if job_name is None and filepath is None:
             raise ValueError('One of "job_name" or "filepath" is required.')
         if job_name is not None and filepath is not None:
             raise ValueError('Cannot specify both "job_name" and "filepath".')
         elif job_name is not None:
-            self.build_driver = build_driver
+            self.train_image = train_image
             self.train_driver = train_driver
             self.job_name = job_name
 
@@ -98,8 +124,15 @@ class TrainJob:
                 raise NotImplementedError(
                     'Currently only Jupyter notebooks and Python scripts are supported.'
                 )
-            if build_driver != 'local' and build_driver != 'local-gpu':
-                raise NotImplementedError('Currently only local Docker builds are supported.')
+            if train_image != 'default-cpu' and train_image != 'default-cpu':
+                logger.info(f'Using the {train_image!r} image as the base environment image.')
+                # TODO: verify that the train_image is valid.
+                # TODO: pull the image if necessary.
+                # TODO: update the default image based on which training service is used.
+            elif train_image == 'default-cpu':
+                logger.info(f'Using the default CPU image as the base environment image.')
+            elif train_image == 'default-gpu':
+                logger.info(f'Using the default GPU image as the base environment image.')
 
             # Check driver-specific configuration requirements
             if train_driver == 'sagemaker':
@@ -208,7 +241,7 @@ class TrainJob:
 
             if train_driver == 'sagemaker':
                 dockerfile, runfile = create_sagemaker_resources(
-                    build_driver, train_driver, dirpath, filepath, envfile, overwrite
+                    train_image, train_driver, dirpath, filepath, envfile, overwrite
                 )
             else:  # train_driver == 'kaggle':
                 # Kaggle kernels run in a default environment. The web UI allows you to 
@@ -246,7 +279,7 @@ class TrainJob:
 
             self.dirpath = dirpath
             self.filepath = filepath
-            self.build_driver = build_driver
+            self.train_image = train_image
             self.train_driver = train_driver
             self.config = config
             self.tag = tag
@@ -255,6 +288,13 @@ class TrainJob:
             self.docker_client = docker.client.from_env()
 
     def status(self):
+        """
+        Returns the status of this job instance. May be one of the following:
+        * `unlaunched` --- This job has not been launched (sent to compute using `fit`) yet.
+        * `submitted` --- This job has been submitted to cloud compute. It has not terminated yet.
+        * `complete` --- This job has finished running, and you may call `fetch` to get your model.
+        * `failed` --- This job has failed. Use the training driver's web tools to determine why.
+        """
         if self._latest_status == 'unlaunched':
             return 'unlaunched'
         elif self._latest_status == 'submitted':
@@ -307,11 +347,11 @@ class TrainJob:
 
     @classmethod
     def from_model_definition(
-        cls, filepath, build_driver='local', train_driver='sagemaker',
+        cls, filepath, train_image='default-cpu', train_driver='sagemaker',
         envfile=None, overwrite=False, config=None
     ):
         return cls(
-            filepath=filepath, build_driver=build_driver, train_driver=train_driver,
+            filepath=filepath, train_image=train_image, train_driver=train_driver,
             envfile=envfile, overwrite=overwrite, config=config
         )
 
@@ -326,7 +366,7 @@ class TrainJob:
         Builds the model training image. This is the first step in the model training workflow.
         """
         if self.train_driver != 'kaggle':
-            if self.build_driver == 'local' or self.build_driver == 'local-gpu':
+            if self.train_image == 'default-cpu' or self.train_image == 'default-gpu':
                 path = self.dirpath.as_posix()
                 logger.info(f'Building "{self.tag}" container image from "{path}".')
                 self.docker_client.images.build(path=path, tag=self.tag, rm=True)
@@ -340,7 +380,8 @@ class TrainJob:
         training image. The repository used depends on the `train_driver`:
 
         * 'sagemaker' -- Pushes the image to Amazon ECR.
-        * 'kaggle' -- Does nothing, only the default runtime environment is available.
+        * 'kaggle' -- Does nothing, only the default runtime environment is available, so no
+          registry is necessary.
         """
         if self.train_driver == 'sagemaker':
             import boto3
@@ -527,7 +568,8 @@ class TrainJob:
 
         Raises
         ------
-        ValueError -- Raised if you attempt to `fetch` without first running `fit`.
+        ValueError -- Raised if you attempt to `fetch` without first running `fit`, or if the job
+        is not finished running yet.
         """
         if self.status() == 'unlaunched':
             raise ValueError('Cannot fetch TrainJob model artifacts without fitting first.')
@@ -643,14 +685,14 @@ def create_template(template_name, dirpath, filename, **kwargs):
         f.write(template_text)
 
 
-def create_dockerfile(build_driver, train_driver, dirpath, filepath, envfile):
+def create_dockerfile(train_image, train_driver, dirpath, filepath, envfile):
     """
     Creates a Dockerfile compatible with the given drivers and writes to to disk.
 
     Parameters
     ----------
-    build_driver: str
-        The build_driver (service) that will build the model image.
+    train_image: str
+        The train_image that will build the model image.
     train_driver: str
         The train_driver (service) that will perform the training.
     dirpath: str
@@ -663,21 +705,21 @@ def create_dockerfile(build_driver, train_driver, dirpath, filepath, envfile):
     if train_driver == 'sagemaker':
         create_template(
             'sagemaker/Dockerfile.template', dirpath, 'Dockerfile', 
-            filepath=filepath, envfile=envfile, build_driver=build_driver
+            filepath=filepath, envfile=envfile, train_image=train_image
         )
     else:
         raise NotImplementedError
 
 
-def create_runfile(build_driver, train_driver, dirpath, filepath):
+def create_runfile(train_image, train_driver, dirpath, filepath):
     """
     Creates a run.sh entrypoint for the Docker image compatible with the given `train_driver`,
     and writes it to disk.
 
     Parameters
     ----------
-    build_driver: str
-        The build_driver (service) that will build the model image.
+    train_image: str
+        The train_image (service) that will build the model image.
     train_driver: str
         The train_driver (service) that will perform the training.
     dirpath: str
@@ -701,7 +743,7 @@ def create_runfile(build_driver, train_driver, dirpath, filepath):
         raise NotImplementedError
 
 
-def create_sagemaker_resources(build_driver, train_driver, dirpath, filepath, envfile, overwrite):
+def create_sagemaker_resources(train_image, train_driver, dirpath, filepath, envfile, overwrite):
     """
     Creates file resources that will be used by this library in a target directory 
     (specifically, a Dockerfile and a run.sh entrypoint). Calls `create_runfile` and
@@ -711,8 +753,8 @@ def create_sagemaker_resources(build_driver, train_driver, dirpath, filepath, en
 
     Parameters
     ----------
-    build_driver: str
-        The build_driver (service) that will build the model image.
+    train_image: str
+        The train_image (service) that will build the model image.
     train_driver: str
         The train_driver (service) that will perform the training.
     dirpath: str
@@ -740,10 +782,10 @@ def create_sagemaker_resources(build_driver, train_driver, dirpath, filepath, en
             f'A Dockerfile already exists at "{dockerfile}" and "overwrite" is set to True. '
             f'Overwriting the file that is currently there.'
         )
-        create_dockerfile(build_driver, train_driver, dirpath, filepath.name, envfile)
+        create_dockerfile(train_image, train_driver, dirpath, filepath.name, envfile)
     else:  # dockerfile_exists
         logger.info(f'Creating new Dockerfile at "{dockerfile}".')
-        create_dockerfile(build_driver, train_driver, dirpath, filepath.name, envfile)
+        create_dockerfile(train_image, train_driver, dirpath, filepath.name, envfile)
 
     runfile = dirpath / 'run.sh'
     runfile_exists = runfile.exists()
@@ -757,10 +799,10 @@ def create_sagemaker_resources(build_driver, train_driver, dirpath, filepath, en
             f'An image entrypoint already exists at "{runfile}" and "overwrite" is set to True. '
             f'Overwriting the file that is currently there.'
         )
-        create_runfile(build_driver, train_driver, dirpath, filepath)
+        create_runfile(train_image, train_driver, dirpath, filepath)
     else:  # runfile_exists
         logger.info(f'Creating new image entrypoint at "{runfile}".')
-        create_runfile(build_driver, train_driver, dirpath, filepath)  
+        create_runfile(train_image, train_driver, dirpath, filepath)  
 
     return dockerfile, runfile
 

@@ -112,7 +112,7 @@ class TestFit(unittest.TestCase):
                 ]
                 assert self.cli.invoke(fahr_cli.fit, args).exit_code == 0
                 train_job_mock.assert_called_once_with(
-                    build_driver='local', config={'username': 'TestUser'},
+                    train_image='default-cpu', config={'username': 'TestUser'},
                     filepath='train.py', overwrite=False, train_driver='kaggle'
                 )
                 train_job_mock.return_value.fit.assert_called_once_with()
@@ -130,7 +130,7 @@ class TestFit(unittest.TestCase):
                 ]
                 assert self.cli.invoke(fahr_cli.fit, args).exit_code == 0
                 train_job_mock.assert_called_once_with(
-                    build_driver='local', filepath='train.py', overwrite=False,
+                    train_image='default-cpu', filepath='train.py', overwrite=False,
                     train_driver='sagemaker',
                     config={'role': 'TestRole', 'output_path': 's3://nonexistent-bucket/'}
                 )

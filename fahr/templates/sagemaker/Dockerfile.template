@@ -1,7 +1,9 @@
-{% if build_driver == 'local' -%}
+{% if build_driver == 'default-cpu' -%}
 FROM python:latest
-{% else -%}
+{% elif build_driver == 'default-gpu' -%}
 FROM tensorflow/tensorflow:1.10.1-gpu-py3
+{% else %}
+FROM {{ build_driver }}
 {% endif -%}
 
 # set the working directory
@@ -20,7 +22,7 @@ RUN pip install -r requirements.txt
 COPY run.sh .
 COPY {{ filepath }} .
 ENV FAHR_EXECUTION_ENVIRONMENT sagemaker
-{% if build_driver == 'local-gpu' -%}
+{% if build_driver != 'local-cpu' -%}
 ENV NVIDIA_VISIBLE_DEVICES all
 ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
 {% endif %}
