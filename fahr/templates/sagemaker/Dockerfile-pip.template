@@ -15,7 +15,7 @@ WORKDIR app
 RUN apt-get update
 RUN apt-get install -y --no-install-recommends build-essential gcc
 RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+ENV PATH /opt/venv/bin:$PATH
 
 # install code dependencies
 COPY {{ envfile }} .
@@ -35,7 +35,7 @@ COPY --from=compile-image /opt/venv /opt/venv
 COPY run.sh .
 COPY {{ filepath }} .
 ENV FAHR_EXECUTION_ENVIRONMENT sagemaker
-ENV PATH="/opt/venv/bin:$PATH"
+ENV PATH /opt/venv/bin:$PATH
 {% if train_image != 'default-cpu' -%}
 ENV NVIDIA_VISIBLE_DEVICES all
 ENV NVIDIA_DRIVER_CAPABILITIES compute,utility

@@ -45,13 +45,6 @@ class TestTrainJobInit(unittest.TestCase):
         with pytest.raises(NotImplementedError):  # train driver not in list of accepted drivers
             TrainJob(filepath=FILEPATH, train_driver='nondriver')
 
-    def test_invalid_build_driver(self):
-        # TODO: implement test
-        # build driver not a valid build driver, e.g. not a valid Docker tag
-        pass
-        # with pytest.raises(NotImplementedError):
-        #     TrainJob(filepath=FILEPATH, **{**kaggle_kwargs, **{'train_image': 'nondriver'}})
-
     def test_kaggle_init_valid(self):
         # test basic initialization with the kaggle driver
         with patch('fahr.fahr.create_kaggle_resources', new=create_resources_mock):
@@ -95,12 +88,16 @@ class TestTrainJobInit(unittest.TestCase):
         with pytest.raises(ValueError):
             TrainJob(filepath=FILEPATH, **kwargs)
 
-    # TODO: test the case that envfile is unspecified and the default envfile doesn't exist
+    def test_init_invalid_no_default_envfile(self):
+        with patch('fahr.fahr.create_sagemaker_resources', new=create_resources_mock), \
+            patch('pathlib.Path.exists', return_value=False):
+            with pytest.raises(ValueError):  # no envfile param and default envfile doesn't exist
+                TrainJob(filepath=FILEPATH, **sagemaker_kwargs)
 
-    @patch('pathlib.Path.exists', lambda _: True)
-    def test_init_invalid_envfile(self):
-        with pytest.raises(ValueError):  # envfile is not a requirements.txt
-            TrainJob(filepath=FILEPATH, envfile='./environment.yml', **sagemaker_kwargs)
+    def test_init_valid_conda(self):
+        with patch('fahr.fahr.create_sagemaker_resources', new=create_resources_mock), \
+            patch('pathlib.Path.exists', return_value=True):
+            TrainJob(filepath=FILEPATH, envfile='./environment.yaml', **sagemaker_kwargs)
 
     def test_sagemaker_init_no_envfile(self):
         with pytest.raises(ValueError):  # envfile doesn't exist

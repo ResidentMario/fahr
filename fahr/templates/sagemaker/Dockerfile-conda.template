@@ -1,0 +1,34 @@
+{% if train_image == 'default-cpu' -%}
+FROM continuumio/miniconda3:latest
+{% elif train_image == 'default-gpu' -%}
+FROM tensorflow/tensorflow:1.10.1-gpu-py3
+{% else %}
+FROM {{ train_image }}
+{% endif -%}
+
+# set the working directory
+RUN mkdir app
+WORKDIR app
+
+{% if envfile is not none -%}
+# instantiate environment dependencies
+COPY {{ envfile }} .
+RUN conda env create -n conda-env -f environment.yaml \
+    && conda clean -afy
+ENV PATH /opt/conda/envs/conda-env/bin:$PATH
+{% endif -%}
+
+# install environment dependencies
+COPY run.sh .
+COPY {{ filepath }} .
+ENV FAHR_EXECUTION_ENVIRONMENT sagemaker
+{% if train_image != 'default-cpu' -%}
+ENV NVIDIA_VISIBLE_DEVICES all
+ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
+{% endif %}
+
+# provision environment
+RUN chmod +x ./run.sh
+EXPOSE 8080
+ENTRYPOINT ["./run.sh"]
+CMD ["build"]

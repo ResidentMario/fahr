@@ -17,7 +17,7 @@ class TestInit(unittest.TestCase):
     def setUp(self):
         self.cli = CliRunner()
 
-    # TODO: investigate why this fails on Travis CI/CD
+    # TODO: investigate why this fails on TravisCI
     @pytest.mark.xfail
     def test_sagemaker_init(self):
         with self.cli.isolated_filesystem():

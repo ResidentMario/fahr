@@ -126,9 +126,6 @@ class TrainJob:
                 )
             if train_image != 'default-cpu' and train_image != 'default-cpu':
                 logger.info(f'Using the {train_image!r} image as the base environment image.')
-                # TODO: verify that the train_image is valid.
-                # TODO: pull the image if necessary.
-                # TODO: update the default image based on which training service is used.
             elif train_image == 'default-cpu':
                 logger.info(f'Using the default CPU image as the base environment image.')
             elif train_image == 'default-gpu':
@@ -231,12 +228,19 @@ class TrainJob:
                     raise ValueError(
                         f'Cannot set "envfile" to non-existent file {envfile.as_posix()}.'
                     )
-                if not envfile.name == 'requirements.txt':
-                    raise ValueError(
-                        'Currently only environment definition files of the "requirements.txt" '
-                        'type are supported.'
-                    )
                 logger.info(f'Using "{envfile}" as the environment definition file.')
+                if envfile.name == 'requirements.txt':
+                    logger.info(f'Using pip to install job dependencies.')
+                elif envfile.name == 'environment.yaml':
+                    logger.info(f'Using conda to install job dependencies.')
+                else:
+                    raise ValueError(
+                        f'Environment instantiation is only currently supported with '
+                        f'"requirements.txt" and pip or "environment.yaml" and conda. '
+                        f'Environment definition file {envfile.as_posix()!r} is not supported.'
+                    )
+
+                # envfile must be in relative form for its Dockerfile definition
                 envfile = envfile.absolute().relative_to(pathlib.Path.cwd()).as_posix()
 
             if train_driver == 'sagemaker':
@@ -699,14 +703,22 @@ def create_dockerfile(train_image, train_driver, dirpath, filepath, envfile):
         Path to the directory being bundled.
     filepath: str
         Name of the model training artifact being bundled.
-    envfile: str
-        Path to the environment file that will be built in the image.
+    envfile: str or None
+        Path to the environment file that will be built in the image. If no environment
+        file is to be used, this variable will be set to None.
     """
     if train_driver == 'sagemaker':
-        create_template(
-            'sagemaker/Dockerfile.template', dirpath, 'Dockerfile', 
-            filepath=filepath, envfile=envfile, train_image=train_image
-        )
+        if envfile is None or pathlib.Path(envfile).name == 'requirements.txt':
+            create_template(
+                'sagemaker/Dockerfile-pip.template', dirpath, 'Dockerfile', 
+                filepath=filepath, envfile=envfile, train_image=train_image
+            )
+        else:  # pathlib.Path(envfile).name == 'environment.yaml'
+            create_template(
+                'sagemaker/Dockerfile-conda.template', dirpath, 'Dockerfile', 
+                filepath=filepath, envfile=envfile, train_image=train_image
+            )
+            pass
     else:
         raise NotImplementedError
 
@@ -783,7 +795,7 @@ def create_sagemaker_resources(train_image, train_driver, dirpath, filepath, env
             f'Overwriting the file that is currently there.'
         )
         create_dockerfile(train_image, train_driver, dirpath, filepath.name, envfile)
-    else:  # dockerfile_exists
+    else:  # not dockerfile_exists
         logger.info(f'Creating new Dockerfile at "{dockerfile}".')
         create_dockerfile(train_image, train_driver, dirpath, filepath.name, envfile)
 
