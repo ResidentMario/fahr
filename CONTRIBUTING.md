@@ -31,7 +31,7 @@ Note that `fahr` is currently Python 3.6+ only.
 
 ### Tests
 
-There are no tests. :)
+The `tests` folder contains tests. You may run the core tests by running `pytest test_fahr.py` and the CLI tests by running `pytest test_cli.py`.
 
 ## Documentation
 
