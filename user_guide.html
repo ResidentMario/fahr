@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>User Guide &mdash; fahr 0.0.1 documentation</title>
+  <title>User Guide &mdash; fahr 0.0.2 documentation</title>
   
 
   
@@ -160,70 +160,58 @@
 <p>Assuming you’ve read the <a class="reference external" href="https://residentmario.github.io/fahr/quickstart.html">Quickstart</a>, you now know how to run remote training jobs using the <code class="docutils literal notranslate"><span class="pre">fahr</span></code> command line. This section covers additional features and usage patterns useful for working with this tool.</p>
 <div class="section" id="motivation">
 <h2>Motivation<a class="headerlink" href="#motivation" title="Permalink to this headline">¶</a></h2>
-<p>The <a class="reference external" href="https://github.com/ResidentMario/progressive-resizing">progressive resizing</a> repo demonstrates a good pattern for using <code class="docutils literal notranslate"><span class="pre">fahr</span></code>, and it’s the example I will use throughout this section of the documentation.</p>
 <p><a class="reference external" href="https://www.residentmar.io/2019/02/23/data-science-experiments.html">Machine learning is an experimental discipline</a>, so it’s not obvious what an performant model will look like right away. You have to experiment with a lot of ideas (and potentially fumble with many of them) to get there.</p>
-<p>Your earliest experiments should be simple baseline models that you can hopefully run locally. However, once you start digging into the model - more layers, more complex loss functions, longer training cycles, advanced hyperparameter tuning - the complexity of the model will start to exceed your ability to train it locally without long waiting times.</p>
-<p>Using a powerful cloud Jupyter environment like AWS SageMaker Notebooks will buy you time, but with a sufficiently complex model you <em>will</em> get the to the point where your model takes an hour or more to train. And once a long training job is running in your notebook, you can’t really do anything else there because it’s waiting for your training job to finish. If you start working on your models in a separate notebook that not only breaks up your flow but also, if you’re still on the same instance, gets in the way of your training job, which is (hopefully) using up most of your compute resources.</p>
-<p>It’s a better user experience if you can bundle up your current training job, ship it off to some remote service somewhere, and get back to iterating on your ideas. You won’t know whether the particular idea you’re experimenting with is “good” or not until that hour passes and you get back a result, but that shouldn’t stop you from concurrently trying out other ideas as well while you wait for that one to finish.</p>
+<p>Your earliest experiments should be simple baseline models that you can hopefully run locally. However, once you start digging into the model&amp;mdash;more layers, larger inputs, more epochs, hyperparameter tuning&amp;mdash;you will get to the point where the model can no longer be comfortably run on your local machine.</p>
+<p>Once a long training job is running on your machine, you can’t really do anything else there because the training job is using up most of your compute resources.  It’s a better user experience if you can bundle the training job up, ship it off to some remote service somewhere, and get back to iterating on your ideas. You won’t know the result of the experiment until some number of minutes or hours later&amp;mdash;but that shouldn’t stop you from concurrently trying out other ideas as well while you wait for that one to finish.</p>
 <p><code class="docutils literal notranslate"><span class="pre">fahr</span></code> lets you do that.</p>
 </div>
 <div class="section" id="the-workflow">
 <h2>The workflow<a class="headerlink" href="#the-workflow" title="Permalink to this headline">¶</a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">build-models.ipynb</span></code> notebook in the demo repo demonstrates the workflow. <a class="reference external" href="https://github.com/ResidentMario/progressive-resizing/blob/master/notebooks/build-models.ipynb">Open it yourself</a> to follow along. Note that this example uses the <a class="reference external" href="https://residentmario.github.io/fahr/drivers/sagemaker.html">SageMaker driver</a>, but all drivers are equally compatible.</p>
-<p>The first time you want to run a remote training job you will need to create some resources:</p>
+<p>I use the following simple but effective workflow. <a class="reference external" href="https://github.com/ResidentMario/progressive-resizing/blob/master/notebooks/build-models.ipynb">Also demonstrated here</a>. Note that this example uses the <a class="reference external" href="https://residentmario.github.io/fahr/drivers/sagemaker.html">SageMaker driver</a>, but all drivers are equally compatible.</p>
+<p>This example uses AWS SageMaker, and requires you have configured your environment to work with AWS SageMaker (see the <a class="reference external" href="https://residentmario.github.io/fahr/drivers/sagemaker.html">Sagemaker driver</a> section), but other drivers are similar.</p>
 <ol class="arabic">
-<li><p class="first">Once your models get too complex to train comfortably locally, create a <code class="docutils literal notranslate"><span class="pre">models</span></code> folder in your repo.</p>
+<li><p class="first">Create a <code class="docutils literal notranslate"><span class="pre">models</span></code> folder in your repo.</p>
 </li>
-<li><p class="first">Create a folder for your first remotely-trained experiment: in <code class="docutils literal notranslate"><span class="pre">progressive-resizing</span></code> this was a model I named <code class="docutils literal notranslate"><span class="pre">resnet48_128</span></code>.</p>
+<li><p class="first">Create a folder for your first remote experiment, e.g. <code class="docutils literal notranslate"><span class="pre">resnet48_128</span></code>.</p>
 </li>
-<li><p class="first">Add a <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code> file to the folder that documents the packages required for your model traning jobs to run (<code class="docutils literal notranslate"><span class="pre">keras</span></code>, <code class="docutils literal notranslate"><span class="pre">numpy</span></code>, etcetera).</p>
+<li><p class="first"><code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">freeze</span> <span class="pre">&gt;</span> <span class="pre">requirements.txt</span></code> or <code class="docutils literal notranslate"><span class="pre">conda</span> <span class="pre">env</span> <span class="pre">export</span> <span class="pre">--file</span> <span class="pre">environment.yml</span></code> to create a package dependencies manifest.</p>
 </li>
-<li><p class="first">Create a model training artifact: a <code class="docutils literal notranslate"><span class="pre">train.py</span></code> or <code class="docutils literal notranslate"><span class="pre">train.ipynb</span></code> file that defines the training regimen.</p>
+<li><p class="first">Copy your training notebook (e.g. <code class="docutils literal notranslate"><span class="pre">model-dev.ipynb</span></code>) or script (e.g. <code class="docutils literal notranslate"><span class="pre">train.py</span></code>) to the folder. You may need to make some minor code adjustments to make it compatible with your training driver.</p>
 </li>
-<li><p class="first">Go into the model folder and run <code class="docutils literal notranslate"><span class="pre">fahr</span> <span class="pre">init</span></code>:</p>
+<li><p class="first">Run <code class="docutils literal notranslate"><span class="pre">fahr</span> <span class="pre">init</span></code> to initialize the job assets:</p>
 <blockquote>
 <div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ fahr init train.py <span class="se">\</span>
     --train-driver<span class="o">=</span><span class="s1">&#39;sagemaker&#39;</span> <span class="se">\</span>
-    --build-driver<span class="o">=</span><span class="s1">&#39;local-gpu&#39;</span> <span class="se">\</span>
-    --config.output_path<span class="o">=</span><span class="nv">$S3_ARTIFACT_DIRECTORY</span> <span class="se">\</span>
-    --config.role_name<span class="o">=</span><span class="nv">$EXECUTION_ROLE_NAME</span>
+    --train-image<span class="o">=</span><span class="s1">&#39;default-gpu&#39;</span> <span class="se">\</span>
+    --config.output_path<span class="o">=</span>s3://your-s3-bucket/path/ <span class="se">\</span>
+    --config.role_name<span class="o">=</span>your-s3-role
 </pre></div>
 </div>
 </div></blockquote>
-<p>Note the <code class="docutils literal notranslate"><span class="pre">--build-driver='local-gpu'</span></code> argument. This specifies that you are building a image that uses the GPU, and requires that you train in a GPU-equipped and configured environment. See the <a class="reference external" href="https://residentmario.github.io/fahr/drivers/sagemaker.html">SageMaker driver</a> instructions to learn more.</p>
-</li>
-<li><p class="first">You should now have some model training artifacts in your folder. In all non-<code class="docutils literal notranslate"><span class="pre">kaggle</span></code> cases this will be a <code class="docutils literal notranslate"><span class="pre">Dockerfile</span></code> compatible with your training driver and a <code class="docutils literal notranslate"><span class="pre">run.sh</span></code> script that acts as the entrypoint to that image. You can edit these to your liking. For exampe, in the demo repo I added some commands to download the dataset to <code class="docutils literal notranslate"><span class="pre">run.sh</span></code> (<a class="reference external" href="https://github.com/ResidentMario/progressive-resizing/blob/master/resnet48_128/run.sh">see here</a>).</p>
+<p>Note: if you are in an environment lacking a GPU, use <code class="docutils literal notranslate"><span class="pre">--build-driver='default-cpu'</span></code>.</p>
+<p>You should now have two model training artifacts in your folder, a <code class="docutils literal notranslate"><span class="pre">Dockerfile</span></code> and a <code class="docutils literal notranslate"><span class="pre">run.sh</span></code> entrypoint, which you may optionally edit.</p>
 </li>
 <li><p class="first">Run <code class="docutils literal notranslate"><span class="pre">fahr</span> <span class="pre">fit</span></code> and launch the job:</p>
 <blockquote>
 <div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ fahr fit train.py <span class="se">\</span>
     --train-driver<span class="o">=</span><span class="s1">&#39;sagemaker&#39;</span> <span class="se">\</span>
     --build-driver<span class="o">=</span><span class="s1">&#39;local-gpu&#39;</span> <span class="se">\</span>
-    --config.output_path<span class="o">=</span><span class="nv">$S3_ARTIFACT_DIRECTORY</span> <span class="se">\</span>
-    --config.role_name<span class="o">=</span><span class="nv">$EXECUTION_ROLE_NAME</span>
+    --config.output_path<span class="o">=</span>s3://your-s3-bucket/path/ <span class="se">\</span>
+    --config.role_name<span class="o">=</span>your-s3-role
 </pre></div>
 </div>
 </div></blockquote>
 </li>
 </ol>
-<p>The process for every run after the first is similar, but simpler:</p>
-<ol class="arabic">
-<li><p class="first">Create a new folder for the experiment.</p>
-</li>
-<li><p class="first">Copy the files over:</p>
+<p>You will get a message to <code class="docutils literal notranslate"><span class="pre">stdout</span></code> once the job is running explaining where to go to track it.</p>
+<p>For jobs after the first one, you can use the handy <code class="docutils literal notranslate"><span class="pre">copy</span></code> method to move any files you need over:</p>
 <blockquote>
 <div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ fahr copy ../resnet48_128/ ./ <span class="se">\</span>
     --include-training-artifact<span class="o">=</span><span class="s1">&#39;train.py&#39;</span>
 </pre></div>
 </div>
 </div></blockquote>
-</li>
-<li><p class="first">Edit as necessary - add or remote packages from the <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code>, update environment variables in the <code class="docutils literal notranslate"><span class="pre">Dockerfile</span></code>, etcetera.</p>
-</li>
-<li><p class="first">Run <code class="docutils literal notranslate"><span class="pre">fahr</span> <span class="pre">fit</span></code> again to launch the new job.</p>
-</li>
-</ol>
-<p>One of the great things about this workflow is that it makes it easy to brute-force model hyperparameter search. When I was trying to find the optimal <code class="docutils literal notranslate"><span class="pre">batch_size</span></code> in the demo repo, I didn’t bother writing additional code to perform a grid search, I just launched three jobs concurrently, one each at 512, 256, and 128 samples per batch.</p>
+<p>One of the great things about this workflow is that it makes it easy to brute-force model hyperparameter search. For example, to find the optimal <code class="docutils literal notranslate"><span class="pre">batch_size</span></code> parameter for the model in the demo repo I didn’t bother writing additional code to perform a grid search&amp;mdash;I just launched three jobs concurrently, one each at 512, 256, and 128 samples per batch.</p>
 </div>
 </div>
 

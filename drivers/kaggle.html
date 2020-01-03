@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Kaggle &mdash; fahr 0.0.1 documentation</title>
+  <title>Kaggle &mdash; fahr 0.0.2 documentation</title>
   
 
   
@@ -92,8 +92,6 @@
 <li class="toctree-l2"><a class="reference internal" href="#basic-usage">Basic usage</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#limitations">Limitations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#advanced-configuration">Advanced configuration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#tips-and-tricks">Tips and tricks</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#further-reading">Further reading</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="sagemaker.html">SageMaker Driver</a></li>
@@ -164,13 +162,15 @@
             
   <div class="section" id="kaggle">
 <h1>Kaggle<a class="headerlink" href="#kaggle" title="Permalink to this headline">¶</a></h1>
+<img alt="../_images/kaggle-kernels-screenshot.png" src="../_images/kaggle-kernels-screenshot.png" />
 <div class="section" id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
 <p><a class="reference external" href="https://www.kaggle.com/kernels">Kaggle Kernels</a> are a completely free cloud compute environment provided by <a class="reference external" href="https://www.kaggle.com/">Kaggle</a>. Kaggle Kernels differ from the other drivers available in <code class="docutils literal notranslate"><span class="pre">fahr</span></code> in that they were designed to be used and shared inside of Kaggle’s community of machine learners, and as a result they are very beginner-friendly and easy to get started with but are not be the best fit for more serious computational work.</p>
+<p>To learn more about this product see the article <a class="reference external" href="https://towardsdatascience.com/introduction-to-kaggle-kernels-2ad754ebf77">“Introduction to Kaggle Kernels”</a>.</p>
 </div>
 <div class="section" id="specs">
 <h2>Specs<a class="headerlink" href="#specs" title="Permalink to this headline">¶</a></h2>
-<p>Kaggle Kernel instances are free to use for registered users. They provide the following resources:</p>
+<p>Kaggle Kernel instances are free to use for registered users. At time of writing, they provide the following resources:</p>
 <ul class="simple">
 <li>9 hours of execution time</li>
 <li>24 GB of disk space</li>
@@ -182,9 +182,8 @@
 </div>
 <div class="section" id="how-it-works">
 <h2>How it works<a class="headerlink" href="#how-it-works" title="Permalink to this headline">¶</a></h2>
-<p>Kaggle Kernels run inside of a Docker container that is built and maintained by their team. The default container image contains a huge number of data science focused packages, but doesn’t have everything. It is possible to extend this container with custom PyPi packages using the web UI, but this feature is not available from the API.</p>
-<p>To execute a new kernel run you create a <code class="docutils literal notranslate"><span class="pre">kernel-metadata.json</span></code> file specifying run metadata. You then upload this configuration file and a training artifact to Kaggle (because the runtime environment is hardcoded there is no build process, and <code class="docutils literal notranslate"><span class="pre">fahr</span></code> will skip this step during execution). Any file written to the home path and certain other paths on disk during execution is considered a kernel output and will be stored inline with the training artifact in the Kaggle web UI.</p>
-<p>Kaggle also generates a JSON-formatted logfile that captures execution output to <code class="docutils literal notranslate"><span class="pre">STDOUT</span></code> and <code class="docutils literal notranslate"><span class="pre">STDERR</span></code>.</p>
+<p>Kaggle Kernels run inside of a default Docker container that is built and maintained by their team. This environment cannot be modified using the API, and hence, <code class="docutils literal notranslate"><span class="pre">fahr</span></code>.</p>
+<p>To execute a new training job you submit a model definition and a <code class="docutils literal notranslate"><span class="pre">kernel-metadata.json</span></code> metadata file to Kaggle. Any file written to the home path and certain other paths on disk during execution is considered a kernel output and will be availabe for download after execution finishes. A logfile capturing output <code class="docutils literal notranslate"><span class="pre">STDOUT</span></code> and <code class="docutils literal notranslate"><span class="pre">STDERR</span></code> is also provided.</p>
 </div>
 <div class="section" id="prerequisites">
 <h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this headline">¶</a></h2>
@@ -193,6 +192,7 @@
 </div>
 <div class="section" id="basic-usage">
 <h2>Basic usage<a class="headerlink" href="#basic-usage" title="Permalink to this headline">¶</a></h2>
+<img alt="../_images/quickstart-kaggle-kernel-screenshot.png" src="../_images/quickstart-kaggle-kernel-screenshot.png" />
 <p>To run a training job in a Kaggle kernel:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ fahr fit <span class="nv">$MODEL_ARTIFACT_FILEPATH</span> <span class="se">\</span>
     --train-driver<span class="o">=</span><span class="s1">&#39;kaggle&#39;</span> <span class="se">\</span>
@@ -214,24 +214,12 @@
 <h2>Advanced configuration<a class="headerlink" href="#advanced-configuration" title="Permalink to this headline">¶</a></h2>
 <p>The following configuration options are available for <code class="docutils literal notranslate"><span class="pre">fahr</span> <span class="pre">fit</span></code>:</p>
 <ul class="simple">
-<li><code class="docutils literal notranslate"><span class="pre">enable_gpu</span></code> - Train in a GPU environment. Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>. To enable pass <code class="docutils literal notranslate"><span class="pre">--config.enable_gpu=True</span></code>.</li>
-<li><code class="docutils literal notranslate"><span class="pre">enable_internet</span></code> - Train in an Internet-connected environment. Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>. To enable pass <code class="docutils literal notranslate"><span class="pre">--config.enable_internet=True</span></code>.</li>
-<li><code class="docutils literal notranslate"><span class="pre">is_private</span></code> - Whether the resultant kernel is publicly visible or not. Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>. To make your kernel private pass <code class="docutils literal notranslate"><span class="pre">--config.is_private</span></code>.</li>
+<li><code class="docutils literal notranslate"><span class="pre">enable_gpu</span></code> - Train in a GPU environment. To enable pass <code class="docutils literal notranslate"><span class="pre">--config.enable_gpu=True</span></code>.</li>
+<li><code class="docutils literal notranslate"><span class="pre">enable_internet</span></code> - Train in an Internet-connected environment. To enable pass <code class="docutils literal notranslate"><span class="pre">--config.enable_internet=True</span></code>.</li>
+<li><code class="docutils literal notranslate"><span class="pre">is_private</span></code> - Whether the resultant kernel is publicly visible or not. Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code> (public). To make your kernel private pass <code class="docutils literal notranslate"><span class="pre">--config.is_private</span></code>.</li>
 <li><code class="docutils literal notranslate"><span class="pre">dataset_sources</span></code> - What <a class="reference external" href="https://www.kaggle.com/datasets">Kaggle Datasets</a> to include in the kernel environment. Defaults to <code class="docutils literal notranslate"><span class="pre">None</span></code>. To add datasets to the environment pass <code class="docutils literal notranslate"><span class="pre">--config.dataset_sources=[&quot;owner/dataset&quot;,</span> <span class="pre">&quot;otherowner/otherdataset&quot;]</span></code>.</li>
-<li><code class="docutils literal notranslate"><span class="pre">kernel_sources</span></code> - What  Kaggle Kernel data out;uts to include in the kernel environment. Defaults to <code class="docutils literal notranslate"><span class="pre">None</span></code>. To add datasets to the environment pass <code class="docutils literal notranslate"><span class="pre">--config.kernel_sources=[&quot;user/kernelname&quot;,</span> <span class="pre">&quot;otheruser/otherkernelname&quot;]</span></code>.</li>
+<li><code class="docutils literal notranslate"><span class="pre">kernel_sources</span></code> - What  Kaggle Kernel data outputs to include in the kernel environment as input datasets. Defaults to <code class="docutils literal notranslate"><span class="pre">None</span></code>. To add datasets to the environment pass <code class="docutils literal notranslate"><span class="pre">--config.kernel_sources=[&quot;user/kernelname&quot;,</span> <span class="pre">&quot;otheruser/otherkernelname&quot;]</span></code>.</li>
 <li><code class="docutils literal notranslate"><span class="pre">competition_sources</span></code> - What <a class="reference external" href="https://www.kaggle.com/competitions">Kaggle Competitions</a> data to include in the kernel environment. Only active competitions may have their data included in this way via the API, and you must have already agreed to the rules of the competition via the Kaggle website. To add competition data to the environment pass <code class="docutils literal notranslate"><span class="pre">--config.competition_sources=[&quot;owner/dataset&quot;,</span> <span class="pre">&quot;otherowner/otherdataset&quot;]</span></code>.</li>
-</ul>
-</div>
-<div class="section" id="tips-and-tricks">
-<h2>Tips and tricks<a class="headerlink" href="#tips-and-tricks" title="Permalink to this headline">¶</a></h2>
-<p>The preferred way to load data into a kernel is the use a <a class="reference external" href="https://www.kaggle.com/datasets">Kaggle Dataset</a>, which will be available from the <code class="docutils literal notranslate"><span class="pre">../input/</span></code> folder at execution time. However, this requires uploading data to Kaggle, which you may or may not be OK with - datasets can be private, but there is a limit to how much private data you can have.</p>
-<p>Alternatively you may use an Internet-enabled kernel and download the data you need that way.</p>
-</div>
-<div class="section" id="further-reading">
-<h2>Further reading<a class="headerlink" href="#further-reading" title="Permalink to this headline">¶</a></h2>
-<ul class="simple">
-<li><a class="reference external" href="https://towardsdatascience.com/introduction-to-kaggle-kernels-2ad754ebf77">Introduction to Kaggle Kernels</a></li>
-<li><a class="reference external" href="https://www.kaggle.com/docs/api">Kaggle API Docs</a></li>
 </ul>
 </div>
 </div>

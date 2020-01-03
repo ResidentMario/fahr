@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Quickstart &mdash; fahr 0.0.1 documentation</title>
+  <title>Quickstart &mdash; fahr 0.0.2 documentation</title>
   
 
   
@@ -158,35 +158,31 @@
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pip install fahr<span class="o">[</span>kaggle<span class="o">]</span>
 </pre></div>
 </div>
-<p>For the purposes of this demo we will use a very simple <code class="docutils literal notranslate"><span class="pre">train.py</span></code> which builds a tiny <code class="docutils literal notranslate"><span class="pre">keras</span></code> feedforward network on synthetic data. This script uses <code class="docutils literal notranslate"><span class="pre">numpy</span></code> and <code class="docutils literal notranslate"><span class="pre">keras</span></code> so we’ll need to install these packages also:</p>
+<p>For the purposes of this demo we will use a very simple <code class="docutils literal notranslate"><span class="pre">train.py</span></code> which builds a tiny <code class="docutils literal notranslate"><span class="pre">keras</span></code> feedforward neural network on synthetic data. This script uses <code class="docutils literal notranslate"><span class="pre">numpy</span></code> and <code class="docutils literal notranslate"><span class="pre">keras</span></code> so we’ll need to install these packages also:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ yes <span class="p">|</span> pip install numpy keras
 $ curl https://gist.githubusercontent.com/ResidentMario/ab3ce65a9bd5bc4061237a374fd9e67a/raw/train.py -o train.py
 </pre></div>
 </div>
-<p>Executing this file saves a model definition file to your local disk:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ python train.py
+<p><code class="docutils literal notranslate"><span class="pre">fahr</span></code> takes a <strong>training artifact</strong> such as this one as input. Training artifacts may be either <code class="docutils literal notranslate"><span class="pre">.py</span></code> Python scripts or <code class="docutils literal notranslate"><span class="pre">.ipynb</span></code> Jupyter notebooks, and they must write serialized model assets to disk upon completion.</p>
+<p>Assuming you have access to the Kaggle API (<a class="reference external" href="https://github.com/Kaggle/kaggle-api#api-credentials">see here for details</a>) you can now submit your training job in just one line of code (in all of the lines of code that follow, replace my Kaggle username, <code class="docutils literal notranslate"><span class="pre">ResidentMario</span></code>, with your own):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ fahr fit <span class="s1">&#39;train.py&#39;</span> --train-driver<span class="o">=</span><span class="s1">&#39;kaggle&#39;</span> --config.username<span class="o">=</span><span class="s1">&#39;ResidentMario&#39;</span>
+fahr.fahr - INFO - Writing kernel metadata to <span class="s2">&quot;kernel-metadata.json&quot;</span>.
+fahr.fahr - INFO - Fitting ResidentMario/train training job.
+fahr.fahr - INFO - The training job is now running. To track training progress visit https://www.kaggle.com/ResidentMario/train. To download finished model artifacts run fahr fetch --driver<span class="o">=</span><span class="s2">&quot;kaggle&quot;</span> ./ <span class="s2">&quot;ResidentMario/train&quot;</span> after training is complete.
+</pre></div>
+</div>
+<p>You can visit the web interface to your training job by clicking on the kernel link. <a class="reference external" href="https://www.kaggle.com/residentmario/train?scriptVersionId=23976200">Here’s mine</a>:</p>
+<img alt="_images/quickstart-kaggle-kernel-screenshot1.png" src="_images/quickstart-kaggle-kernel-screenshot1.png" />
+<p>Once the job has completed running, you can go ahead and download a <strong>model artifact</strong> using the command documented in the log output. This will download <code class="docutils literal notranslate"><span class="pre">model.h5</span></code> to your local machine:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ fahr fetch --train-driver<span class="o">=</span><span class="s2">&quot;kaggle&quot;</span> ./ <span class="s2">&quot;</span><span class="nv">$USERNAME</span><span class="s2">/train&quot;</span>
+fahr.fahr - INFO - Downloaded model artifact<span class="o">(</span>s<span class="o">)</span> to <span class="s2">&quot;.&quot;</span>.
 $ ls
-model.h5        train.py
+$ model.h5        train.py        Dockerfile        run.sh
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">fahr</span></code> takes a <strong>training artifact</strong> such as this one as input. Training artifacts may be either <code class="docutils literal notranslate"><span class="pre">.py</span></code> Python scripts or <code class="docutils literal notranslate"><span class="pre">.ipynb</span></code> Jupyter notebooks. It generally builds a Docker container wrapping this artifact in a way which is compatible with your chosen <strong>training driver</strong>, then uses the training driver’s native API to upload the container and kick off a training job based on that container.</p>
-<p>Let’s step through that process now, using this file as our training artifact and <a class="reference external" href="https://www.kaggle.com/kernels">Kaggle Kernels</a> as our training driver.</p>
-<p>You will need to have access to the Kaggle API to continue. You will need to have a Kaggle account, so create one if you haven’t done so already. Then, <a class="reference external" href="https://github.com/Kaggle/kaggle-api#api-credentials">follow Kaggle’s instructions</a> to download an auth token to the correct location on your local machine.</p>
-<p>Once everything is tidy you will be able to run the following in your terminal (in all of the lines of code that follow, replace <code class="docutils literal notranslate"><span class="pre">$USERNAME</span></code> with your username on Kaggle):</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ fahr fit <span class="s1">&#39;train.py&#39;</span> --train-driver<span class="o">=</span><span class="s1">&#39;kaggle&#39;</span> --config.username<span class="o">=</span><span class="s1">&#39;$USERNAME&#39;</span>
-fahr.fahr - INFO - Writing kernel metadata to <span class="s2">&quot;</span><span class="nv">$PATH</span><span class="s2">/kernel-metadata.json&quot;</span>.
-fahr.fahr - INFO - Fitting <span class="nv">$USERNAME</span>/train training job.
-fahr.fahr - INFO - The training job is now running. To track training progress visit https://www.kaggle.com/<span class="nv">$USERNAME</span>/train. To download finished model artifacts run fahr fetch --driver<span class="o">=</span><span class="s2">&quot;kaggle&quot;</span> ./ <span class="s2">&quot;</span><span class="nv">$USERNAME</span><span class="s2">/train&quot;</span> after training is complete.
-</pre></div>
-</div>
-<p>You can visit the web interface to your training job by clicking on the kernel link (<a class="reference external" href="https://www.kaggle.com/residentmario/train?scriptVersionId=13462676">here’s mine</a>). Once the job has completed running, you can go ahead and download a <strong>model artifact</strong> using the command documented in the log.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>fahr fetch --train-driver<span class="o">=</span><span class="s2">&quot;kaggle&quot;</span> ./ <span class="s2">&quot;</span><span class="nv">$USERNAME</span><span class="s2">/train&quot;</span>
-</pre></div>
-</div>
-<p>This will download <code class="docutils literal notranslate"><span class="pre">model.h5</span></code> to your local machine.</p>
 <p>And that’s it, you’re done!</p>
-<p>Every training driver in <code class="docutils literal notranslate"><span class="pre">fahr</span></code> uses the same API pattern: <code class="docutils literal notranslate"><span class="pre">fit</span></code> to turn a training artifact into a model artifact “on the cloud”, then <code class="docutils literal notranslate"><span class="pre">fetch</span></code> to download it locally. However, the configuration options (specified via <code class="docutils literal notranslate"><span class="pre">--config.$OPTION_NAME</span></code>) vary between training drivers. The <code class="docutils literal notranslate"><span class="pre">kaggle</span></code> driver is extremely simple: the only required additional argument is <code class="docutils literal notranslate"><span class="pre">--config.username</span></code>. Other drivers require more arguments and more advance configuration, but are also more powerful.</p>
-<p>To learn about the drivers available in <code class="docutils literal notranslate"><span class="pre">fahr</span></code> check out the requisite sections of the docs. To dig deeper into the <code class="docutils literal notranslate"><span class="pre">fahr</span></code> workflow and see what benefits it may have for your use case, check out the <a class="reference external" href="https://residentmario.github.io/fahr/user_guide.html">User Guide</a>.</p>
+<p>Every training driver in <code class="docutils literal notranslate"><span class="pre">fahr</span></code> has just two steps: running <code class="docutils literal notranslate"><span class="pre">fit</span></code> to turn a training artifact into a model artifact “on the cloud”, and then running <code class="docutils literal notranslate"><span class="pre">fetch</span></code> to download the result to local disk.</p>
+<p>To learn more about the <code class="docutils literal notranslate"><span class="pre">fahr</span></code> workflow, see the <a class="reference external" href="https://residentmario.github.io/fahr/user_guide.html">User Guide</a>.</p>
 </div>
 
 

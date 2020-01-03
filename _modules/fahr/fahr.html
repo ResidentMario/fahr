@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>fahr.fahr &mdash; fahr 0.0.1 documentation</title>
+  <title>fahr.fahr &mdash; fahr 0.0.2 documentation</title>
   
 
   
@@ -159,6 +159,7 @@
 <span class="kn">import</span> <span class="nn">json</span>
 <span class="kn">import</span> <span class="nn">ast</span>
 <span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
 
 <span class="kn">import</span> <span class="nn">docker</span>
 <span class="kn">import</span> <span class="nn">jinja2</span>
@@ -174,190 +175,352 @@
 
 <div class="viewcode-block" id="TrainJob"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.TrainJob">[docs]</a><span class="k">class</span> <span class="nc">TrainJob</span><span class="p">:</span>
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">,</span> <span class="n">build_driver</span><span class="o">=</span><span class="s1">&#39;local&#39;</span><span class="p">,</span> <span class="n">train_driver</span><span class="o">=</span><span class="s1">&#39;sagemaker&#39;</span><span class="p">,</span> 
-        <span class="n">envfile</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">job_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">train_image</span><span class="o">=</span><span class="s1">&#39;default-cpu&#39;</span><span class="p">,</span> <span class="n">train_driver</span><span class="o">=</span><span class="s1">&#39;sagemaker&#39;</span><span class="p">,</span>
+        <span class="n">envfile</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="kc">None</span>
     <span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Trains a machine learning model on the cloud.</span>
+<span class="sd">        Object encapsulating a machine learning training job.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
 <span class="sd">        filepath: str</span>
-<span class="sd">            Path to the model training artifact to be executed remotely. </span>
-<span class="sd">            Currently only Jupyter notebooks are supported.</span>
-<span class="sd">        build_driver: str</span>
-<span class="sd">            The driver (service) that will build the model training image. The options are:</span>
+<span class="sd">            Path to the model definition to be executed remotely. A model definition</span>
+<span class="sd">            is an executable code object (currently either a Jupyter notebook or a Python script,</span>
+<span class="sd">            plus optional supporting files), whose output is a model artifact (a serialized model,</span>
+<span class="sd">            a saved weights matrix, etcetera).</span>
 
-<span class="sd">            * &#39;local&#39; -- Builds the model container on your local machine w/o GPU.</span>
-<span class="sd">            * &#39;local-gpu&#39; -- Builds the model container on your local machine w/ GPU.</span>
-<span class="sd">        </span>
-<span class="sd">            Note that if you are using the Kaggle training driver, no build driver needs to be </span>
-<span class="sd">            specified.</span>
+<span class="sd">            One of `filepath` or `job_name` is required. If `filepath` is provided, a `TrainJob`</span>
+<span class="sd">            instance with the `status` `&quot;unlaunched&quot;` is initialized.</span>
+<span class="sd">        job_name: str</span>
+<span class="sd">            If this parameter is provided, `TrainJob` will be initialized with this model training</span>
+<span class="sd">            job, adopting its `status` and model artifact output location. The job can then be used</span>
+<span class="sd">            to `fetch` this job&#39;s model artifacts.</span>
+
+<span class="sd">            One of `filepath` or `job_name` is required. See `job_name` under &quot;Properties&quot; for more</span>
+<span class="sd">            information.</span>
+<span class="sd">        train_image: str</span>
+<span class="sd">            This parameter controls the base image used for the Docker image in which training will</span>
+<span class="sd">            be performed.</span>
+<span class="sd">            </span>
+<span class="sd">            The model definition (see `filepath`) is packaged into a Docker image before being sent</span>
+<span class="sd">            off to train, creating a model training image. This operation is performed on your</span>
+<span class="sd">            local machine (in the future, a `train_driver` parameter may allow for performing this</span>
+<span class="sd">            step on remote compute). The following hard-coded images are provided:</span>
+
+<span class="sd">            * &#39;default-cpu&#39; -- Builds the model container on your local machine without GPU, using</span>
+<span class="sd">              the `python:latest` Docker image.</span>
+<span class="sd">            * &#39;default-gpu&#39; -- Builds the model container on your local machine with GPU support,</span>
+<span class="sd">               using the `tensorflow/tensorflow:1.10.1-gpu-py3` Docker image. Note that this option</span>
+<span class="sd">               requires a machine with a GPU onboard and nvidia-docker</span>
+<span class="sd">               (https://github.com/NVIDIA/nvidia-docker) installed.</span>
+
+<span class="sd">            Alternatively, to specify a different base image, provide that image&#39;s tag as input.</span>
+
+<span class="sd">            Note that no `train_image` is necessary when using the Kaggle job runner, as Kaggle</span>
+<span class="sd">            does not provide the ability to adjust the runtime environment via the API.</span>
 <span class="sd">        train_driver: str</span>
-<span class="sd">            The driver (service) that will perform the training. Currently the options are:</span>
+<span class="sd">            The training driver (service) is the compute platform that performs the training</span>
+<span class="sd">            (executes the model training image). Currently the following options are supported:</span>
 
 <span class="sd">            * &#39;sagemaker&#39; -- Launches a model training job on Amazon using AWS SageMaker.</span>
 <span class="sd">            * &#39;kaggle&#39; -- Launches a model training job on Kaggle using Kaggle Kernels.</span>
 
-<span class="sd">            Future options include &#39;ml-engine&#39;.</span>
-<span class="sd">        envfile: str</span>
-<span class="sd">            Optional path to the file that defines the environment that will be built in the image.</span>
-<span class="sd">            Must be a &quot;requirements.txt&quot; file (which will be parsed with `pip`). If left unspecified</span>
-<span class="sd">            the file present in the build directory will be used.</span>
-<span class="sd">        overwrite: bool</span>
-<span class="sd">            If set to False `TrainJob` will respect any Dockerfile and run.sh files already present</span>
-<span class="sd">            in the build directory. If set to True it will overwrite them.</span>
+<span class="sd">            Support for GCP ML Engine (&#39;ml-engine&#39;) is planned.</span>
+<span class="sd">        envfile: str, optional</span>
+<span class="sd">            Optional path to a `requirements.txt` file. If left unspecified the file present in</span>
+<span class="sd">            the build directory will be used (and if no `requirements.txt` is present, an error</span>
+<span class="sd">            will be raised).</span>
+<span class="sd">            </span>
+<span class="sd">            The envfile defines the list of packages that will be included into the model training</span>
+<span class="sd">            artifact, and should contain every dependency necessary for the model to train</span>
+<span class="sd">            successfully.</span>
+<span class="sd">            </span>
+<span class="sd">            Support for the `conda` `environment.yaml` format is planned.</span>
+<span class="sd">        overwrite: bool, default False</span>
+<span class="sd">            Set this value to True to overwrite any already-created model definition files</span>
+<span class="sd">            (e.g. `run.sh`).</span>
 <span class="sd">        config: dict</span>
 <span class="sd">            A dict of driver-specific configuration variables used to inform how the job is run.</span>
 <span class="sd">            The precise list of configuration options differs from driver to driver. See the</span>
-<span class="sd">            documentation for more information.</span>
+<span class="sd">            User Reference (https://residentmario.github.io/fahr/index.html) for more information.</span>
+<span class="sd">        </span>
+<span class="sd">        Properties</span>
+<span class="sd">        ----------</span>
+<span class="sd">        tag: str</span>
+<span class="sd">            The tag associated with this job. For example, a `TrainJob` initialized with the</span>
+<span class="sd">            `32_16_cnn.py` artifact in the `imagenet` folder might be given the `tag`</span>
+<span class="sd">            `imagenet-32-16-cnn`.</span>
+<span class="sd">        job_name: str</span>
+<span class="sd">            The job&#39;s name. This property will not be available until `fit` has been called.</span>
+<span class="sd">            The job name is closely linked to the tag, e.g. the above.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">filepath</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span>
-        <span class="n">dirpath</span> <span class="o">=</span> <span class="n">filepath</span><span class="o">.</span><span class="n">parent</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;The training artifact points to a non-existent file.&#39;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">filepath</span><span class="o">.</span><span class="n">suffix</span> <span class="o">!=</span> <span class="s1">&#39;.ipynb&#39;</span> <span class="ow">and</span> <span class="n">filepath</span><span class="o">.</span><span class="n">suffix</span> <span class="o">!=</span> <span class="s1">&#39;.py&#39;</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-                <span class="s1">&#39;Currently only Jupyter notebooks and Python scripts are supported.&#39;</span>
-            <span class="p">)</span>
-        <span class="k">if</span> <span class="n">build_driver</span> <span class="o">!=</span> <span class="s1">&#39;local&#39;</span> <span class="ow">and</span> <span class="n">build_driver</span> <span class="o">!=</span> <span class="s1">&#39;local-gpu&#39;</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s1">&#39;Currently only local Docker builds are supported.&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">job_name</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">filepath</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;One of &quot;job_name&quot; or &quot;filepath&quot; is required.&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">job_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">filepath</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Cannot specify both &quot;job_name&quot; and &quot;filepath&quot;.&#39;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">job_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">train_image</span> <span class="o">=</span> <span class="n">train_image</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">train_driver</span> <span class="o">=</span> <span class="n">train_driver</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">job_name</span> <span class="o">=</span> <span class="n">job_name</span>
 
-        <span class="c1"># Check driver-specific configuration requirements</span>
-        <span class="k">if</span> <span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;sagemaker&#39;</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">config</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="s1">&#39;output_path&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">config</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;The SageMaker driver requires an output_path to &quot;s3://&quot;.&#39;</span><span class="p">)</span>
-
-            <span class="c1"># Ensure that the job name is always a valid ARN name</span>
-            <span class="n">tag</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{dirpath.stem}</span><span class="s1">/</span><span class="si">{filepath.stem}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span>
-            <span class="n">regex</span> <span class="o">=</span> <span class="s1">&#39;^[a-zA-Z0-9](-*[a-zA-Z0-9])*&#39;</span>
-            <span class="k">try</span><span class="p">:</span>
-                <span class="k">assert</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">regex</span><span class="p">,</span> <span class="n">tag</span><span class="p">)</span><span class="o">.</span><span class="n">span</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
-            <span class="k">except</span> <span class="p">(</span><span class="ne">AssertionError</span><span class="p">,</span> <span class="ne">AttributeError</span><span class="p">):</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;&quot;File name must satisfy regex &quot;</span><span class="si">{regex}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
-
-        <span class="k">elif</span> <span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;kaggle&#39;</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">config</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="s1">&#39;username&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">config</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;The Kaggle driver requires a username.&#39;</span><span class="p">)</span>
-
-            <span class="c1"># Ensure that the job name is always a valid kernel name</span>
-            <span class="n">filename</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{filepath.stem}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span>
-            <span class="n">regex</span> <span class="o">=</span> <span class="s1">&#39;^[a-zA-Z0-9]{5,}&#39;</span>
-            <span class="k">try</span><span class="p">:</span>
-                <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">regex</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span><span class="o">.</span><span class="n">span</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
-            <span class="k">except</span> <span class="p">(</span><span class="ne">AssertionError</span><span class="p">,</span> <span class="ne">AttributeError</span><span class="p">):</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;&quot;File name must satisfy regex &quot;</span><span class="si">{regex}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
-
-            <span class="n">tag</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{config[&quot;username&quot;]}</span><span class="s1">/</span><span class="si">{filename}</span><span class="s1">&#39;</span>
-
-            <span class="c1"># Ensure that the input sources are valid.</span>
-            <span class="k">for</span> <span class="n">source_param</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;dataset_sources&#39;</span><span class="p">,</span> <span class="s1">&#39;kernel_sources&#39;</span><span class="p">,</span> <span class="s1">&#39;competition_sources&#39;</span><span class="p">]:</span>
-                <span class="k">if</span> <span class="n">source_param</span> <span class="ow">in</span> <span class="n">config</span><span class="p">:</span>
-                    <span class="n">source_val</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="n">source_param</span><span class="p">]</span>
-                    <span class="k">try</span><span class="p">:</span>
-                        <span class="n">parsed_source_val</span> <span class="o">=</span> <span class="n">ast</span><span class="o">.</span><span class="n">literal_eval</span><span class="p">(</span><span class="n">source_val</span><span class="p">)</span>
-                        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">parsed_source_val</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span>
-                        <span class="n">config</span><span class="p">[</span><span class="n">source_param</span><span class="p">]</span> <span class="o">=</span> <span class="n">parsed_source_val</span>
-                    <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">AssertionError</span><span class="p">):</span>
-                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                            <span class="n">f</span><span class="s1">&#39;Invalid input for &quot;</span><span class="si">{source_param}</span><span class="s1">&quot;: &quot;</span><span class="si">{config[source_param]}</span><span class="s1">&quot; &#39;</span>
-                            <span class="n">f</span><span class="s1">&#39;is not a list.&#39;</span>
-                        <span class="p">)</span>
-
-            <span class="c1"># Ensure that the input source actually exist.</span>
-            <span class="k">for</span> <span class="n">dataset</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;dataset_sources&#39;</span><span class="p">,</span> <span class="p">[]):</span>
-                <span class="k">if</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-                    <span class="p">[</span><span class="s2">&quot;kaggle&quot;</span><span class="p">,</span> <span class="s2">&quot;datasets&quot;</span><span class="p">,</span> <span class="s2">&quot;status&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="p">],</span>
-                    <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">STDOUT</span>
-                <span class="p">)</span><span class="o">.</span><span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                        <span class="n">f</span><span class="s1">&#39;Invalid input: the dataset &quot;</span><span class="si">{dataset}</span><span class="s1">&quot; does not exist.&#39;</span>
-                    <span class="p">)</span>
-            <span class="k">for</span> <span class="n">kernel</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;kernel_sources&#39;</span><span class="p">,</span> <span class="p">[]):</span>
-                <span class="k">if</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-                    <span class="p">[</span><span class="s2">&quot;kaggle&quot;</span><span class="p">,</span> <span class="s2">&quot;kernels&quot;</span><span class="p">,</span> <span class="s2">&quot;status&quot;</span><span class="p">,</span> <span class="n">kernel</span><span class="p">],</span>
-                    <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">STDOUT</span>
-                <span class="p">)</span><span class="o">.</span><span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                        <span class="n">f</span><span class="s1">&#39;Invalid input: the kernel &quot;</span><span class="si">{dataset}</span><span class="s1">&quot; does not exist.&#39;</span>
-                    <span class="p">)</span>
-
-            <span class="k">if</span> <span class="s1">&#39;competition_sources&#39;</span> <span class="ow">in</span> <span class="n">config</span><span class="p">:</span>
-                <span class="n">current_competitions</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span>
-                    <span class="p">[</span><span class="s2">&quot;kaggle&quot;</span><span class="p">,</span> <span class="s2">&quot;competitions&quot;</span><span class="p">,</span> <span class="s2">&quot;list&quot;</span><span class="p">],</span>
-                    <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">STDOUT</span>
-                <span class="p">))</span>
-                <span class="k">for</span> <span class="n">competition</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;competition_sources&#39;</span><span class="p">):</span>
-                    <span class="k">if</span> <span class="n">competition</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">current_competitions</span><span class="p">:</span>
-                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                            <span class="n">f</span><span class="s1">&#39;Invalid input: the competition &quot;</span><span class="si">{competition}</span><span class="s1">&quot; does not exist &#39;</span>
-                            <span class="n">f</span><span class="s1">&#39;or is not currently running.&#39;</span>
-                        <span class="p">)</span>
-
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-                <span class="s1">&#39;Currently only AWS SageMaker and Kaggle Kernels are supported.&#39;</span>
-            <span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">train_driver</span> <span class="o">!=</span> <span class="s1">&#39;kaggle&#39;</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">envfile</span><span class="p">:</span>
-                <span class="n">envfile</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">envfile</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">envfile</span><span class="o">.</span><span class="n">name</span> <span class="o">!=</span> <span class="s1">&#39;requirements.txt&#39;</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                        <span class="s1">&#39;&quot;envfile&quot; must point to &quot;requirements.txt&quot; file&#39;</span>
-                    <span class="p">)</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">pip_reqfile</span> <span class="o">=</span> <span class="n">dirpath</span> <span class="o">/</span> <span class="s1">&#39;requirements.txt&#39;</span>
-                <span class="n">pip_reqfile_exists</span> <span class="o">=</span> <span class="n">pip_reqfile</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
-                <span class="k">if</span> <span class="ow">not</span> <span class="n">pip_reqfile_exists</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;No requirements.txt present and no &quot;envfile&quot; specified.&#39;</span><span class="p">)</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="n">envfile</span> <span class="o">=</span> <span class="n">pip_reqfile</span>
-
-            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Using &quot;</span><span class="si">{envfile}</span><span class="s1">&quot; as envfile.&#39;</span><span class="p">)</span>
-
-            <span class="n">envfile</span> <span class="o">=</span> <span class="n">envfile</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="o">.</span><span class="n">cwd</span><span class="p">())</span><span class="o">.</span><span class="n">as_posix</span><span class="p">()</span>
-            <span class="n">dockerfile</span><span class="p">,</span> <span class="n">runfile</span> <span class="o">=</span> <span class="n">create_resources</span><span class="p">(</span>
-                <span class="n">build_driver</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">,</span> <span class="n">envfile</span><span class="p">,</span> <span class="n">overwrite</span>
-            <span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>  <span class="c1"># train_driver == &#39;kaggle&#39;:</span>
-            <span class="c1"># Kaggle kernels run in a default environment. The web UI allows you to </span>
-            <span class="c1"># specify custom packages but the API does not currently support this feature.</span>
-            <span class="k">if</span> <span class="n">envfile</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="s1">&#39;The &quot;envfile&quot; parameter is specified but shouldn</span><span class="se">\&#39;</span><span class="s1">t be.&#39;</span>
-                    <span class="s1">&#39;Kaggle does not currently support running code in custom containers&#39;</span>
-                    <span class="s1">&#39;in the API.&#39;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_latest_status</span> <span class="o">=</span> <span class="s1">&#39;submitted&#39;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>  <span class="c1"># filepath is not None</span>
+            <span class="n">filepath</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span>
+            <span class="n">dirpath</span> <span class="o">=</span> <span class="n">filepath</span><span class="o">.</span><span class="n">parent</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;The training artifact points to a non-existent file.&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">filepath</span><span class="o">.</span><span class="n">suffix</span> <span class="o">!=</span> <span class="s1">&#39;.ipynb&#39;</span> <span class="ow">and</span> <span class="n">filepath</span><span class="o">.</span><span class="n">suffix</span> <span class="o">!=</span> <span class="s1">&#39;.py&#39;</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+                    <span class="s1">&#39;Currently only Jupyter notebooks and Python scripts are supported.&#39;</span>
                 <span class="p">)</span>
-            <span class="n">create_kaggle_resources</span><span class="p">(</span>
-                <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span>
-                <span class="n">title</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;title&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">,</span> <span class="s1">&#39; &#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="s1">&#39; &#39;</span><span class="p">)</span><span class="o">.</span><span class="n">title</span><span class="p">()),</span>
-                <span class="n">is_private</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;is_private&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
-                <span class="n">enable_gpu</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;enable_gpu&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
-                <span class="n">enable_internet</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;enable_internet&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
-                <span class="n">dataset_sources</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;dataset_sources&#39;</span><span class="p">,</span> <span class="p">[]),</span>
-                <span class="n">kernel_sources</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;kernel_sources&#39;</span><span class="p">,</span> <span class="p">[]),</span>
-                <span class="n">competition_sources</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;competition_sources&#39;</span><span class="p">,</span> <span class="p">[]),</span>
-            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">train_image</span> <span class="o">!=</span> <span class="s1">&#39;default-cpu&#39;</span> <span class="ow">and</span> <span class="n">train_image</span> <span class="o">!=</span> <span class="s1">&#39;default-cpu&#39;</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Using the </span><span class="si">{train_image!r}</span><span class="s1"> image as the base environment image.&#39;</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">train_image</span> <span class="o">==</span> <span class="s1">&#39;default-cpu&#39;</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Using the default CPU image as the base environment image.&#39;</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">train_image</span> <span class="o">==</span> <span class="s1">&#39;default-gpu&#39;</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Using the default GPU image as the base environment image.&#39;</span><span class="p">)</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">dirpath</span> <span class="o">=</span> <span class="n">dirpath</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span> <span class="o">=</span> <span class="n">filepath</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">build_driver</span> <span class="o">=</span> <span class="n">build_driver</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">train_driver</span> <span class="o">=</span> <span class="n">train_driver</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">config</span> <span class="o">=</span> <span class="n">config</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">tag</span> <span class="o">=</span> <span class="n">tag</span>
+            <span class="c1"># Check driver-specific configuration requirements</span>
+            <span class="k">if</span> <span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;sagemaker&#39;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">config</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span>
+                    <span class="s1">&#39;output_path&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">config</span> <span class="ow">or</span>
+                    <span class="ow">not</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;output_path&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;s3://&#39;</span><span class="p">)):</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;The SageMaker driver requires an output_path to &quot;s3://&quot;.&#39;</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">train_driver</span> <span class="o">!=</span> <span class="s1">&#39;kaggle&#39;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="s1">&#39;role_name&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">config</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;The SageMaker driver requires a role name.&#39;</span><span class="p">)</span>
+
+                <span class="c1"># Ensure that the job name is always a valid ARN name</span>
+                <span class="n">tag</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{dirpath.stem}</span><span class="s1">/</span><span class="si">{filepath.stem}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span>
+                <span class="n">regex</span> <span class="o">=</span> <span class="s1">&#39;^[a-zA-Z0-9](-*[a-zA-Z0-9])*&#39;</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">assert</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">regex</span><span class="p">,</span> <span class="n">tag</span><span class="p">)</span><span class="o">.</span><span class="n">span</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
+                <span class="k">except</span> <span class="p">(</span><span class="ne">AssertionError</span><span class="p">,</span> <span class="ne">AttributeError</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;&quot;File name must satisfy regex &quot;</span><span class="si">{regex}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;kaggle&#39;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">config</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="s1">&#39;username&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">config</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;The Kaggle driver requires a username.&#39;</span><span class="p">)</span>
+
+                <span class="c1"># Ensure that the job name is always a valid kernel name</span>
+                <span class="n">filename</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{filepath.stem}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span>
+                <span class="n">regex</span> <span class="o">=</span> <span class="s1">&#39;^[a-zA-Z0-9]{5,}&#39;</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">regex</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span><span class="o">.</span><span class="n">span</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+                <span class="k">except</span> <span class="p">(</span><span class="ne">AssertionError</span><span class="p">,</span> <span class="ne">AttributeError</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;&quot;File name must satisfy regex &quot;</span><span class="si">{regex}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
+
+                <span class="n">tag</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{config[&quot;username&quot;]}</span><span class="s1">/</span><span class="si">{filename}</span><span class="s1">&#39;</span>
+
+                <span class="c1"># Ensure that the input sources are valid.</span>
+                <span class="k">for</span> <span class="n">source_param</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;dataset_sources&#39;</span><span class="p">,</span> <span class="s1">&#39;kernel_sources&#39;</span><span class="p">,</span> <span class="s1">&#39;competition_sources&#39;</span><span class="p">]:</span>
+                    <span class="k">if</span> <span class="n">source_param</span> <span class="ow">in</span> <span class="n">config</span><span class="p">:</span>
+                        <span class="n">source_val</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="n">source_param</span><span class="p">]</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="n">parsed_source_val</span> <span class="o">=</span> <span class="n">ast</span><span class="o">.</span><span class="n">literal_eval</span><span class="p">(</span><span class="n">source_val</span><span class="p">)</span>
+                            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">parsed_source_val</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span>
+                            <span class="n">config</span><span class="p">[</span><span class="n">source_param</span><span class="p">]</span> <span class="o">=</span> <span class="n">parsed_source_val</span>
+                        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">AssertionError</span><span class="p">):</span>
+                            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                                <span class="n">f</span><span class="s1">&#39;Invalid input for &quot;</span><span class="si">{source_param}</span><span class="s1">&quot;: &quot;</span><span class="si">{config[source_param]}</span><span class="s1">&quot; &#39;</span>
+                                <span class="n">f</span><span class="s1">&#39;is not a list.&#39;</span>
+                            <span class="p">)</span>
+
+                <span class="c1"># Ensure that the input source actually exist.</span>
+                <span class="k">for</span> <span class="n">dataset</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;dataset_sources&#39;</span><span class="p">,</span> <span class="p">[]):</span>
+                    <span class="k">if</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+                        <span class="p">[</span><span class="s2">&quot;kaggle&quot;</span><span class="p">,</span> <span class="s2">&quot;datasets&quot;</span><span class="p">,</span> <span class="s2">&quot;status&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="p">],</span>
+                        <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">STDOUT</span>
+                    <span class="p">)</span><span class="o">.</span><span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                            <span class="n">f</span><span class="s1">&#39;Invalid input: the dataset &quot;</span><span class="si">{dataset}</span><span class="s1">&quot; does not exist.&#39;</span>
+                        <span class="p">)</span>
+                <span class="k">for</span> <span class="n">kernel</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;kernel_sources&#39;</span><span class="p">,</span> <span class="p">[]):</span>
+                    <span class="k">if</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+                        <span class="p">[</span><span class="s2">&quot;kaggle&quot;</span><span class="p">,</span> <span class="s2">&quot;kernels&quot;</span><span class="p">,</span> <span class="s2">&quot;status&quot;</span><span class="p">,</span> <span class="n">kernel</span><span class="p">],</span>
+                        <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">STDOUT</span>
+                    <span class="p">)</span><span class="o">.</span><span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                            <span class="n">f</span><span class="s1">&#39;Invalid input: the kernel &quot;</span><span class="si">{dataset}</span><span class="s1">&quot; does not exist.&#39;</span>
+                        <span class="p">)</span>
+
+                <span class="k">if</span> <span class="s1">&#39;competition_sources&#39;</span> <span class="ow">in</span> <span class="n">config</span><span class="p">:</span>
+                    <span class="n">current_competitions</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span>
+                        <span class="p">[</span><span class="s2">&quot;kaggle&quot;</span><span class="p">,</span> <span class="s2">&quot;competitions&quot;</span><span class="p">,</span> <span class="s2">&quot;list&quot;</span><span class="p">],</span>
+                        <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">STDOUT</span>
+                    <span class="p">))</span>
+                    <span class="k">for</span> <span class="n">competition</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;competition_sources&#39;</span><span class="p">):</span>
+                        <span class="k">if</span> <span class="n">competition</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">current_competitions</span><span class="p">:</span>
+                            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                                <span class="n">f</span><span class="s1">&#39;Invalid input: the competition &quot;</span><span class="si">{competition}</span><span class="s1">&quot; does not exist &#39;</span>
+                                <span class="n">f</span><span class="s1">&#39;or is not currently running.&#39;</span>
+                            <span class="p">)</span>
+
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+                    <span class="s1">&#39;Currently only AWS SageMaker and Kaggle Kernels are supported.&#39;</span>
+                <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">envfile</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">default_envfile</span> <span class="o">=</span> <span class="n">dirpath</span> <span class="o">/</span> <span class="s1">&#39;requirements.txt&#39;</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">default_envfile</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                        <span class="n">f</span><span class="s1">&#39;No &quot;requirements.txt&quot; included in the model definition directory. &#39;</span>
+                        <span class="n">f</span><span class="s1">&#39;Using the default environment.&#39;</span><span class="p">)</span>
+                    <span class="n">envfile</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Using &quot;</span><span class="si">{default_envfile}</span><span class="s1">&quot; as the environment definition file.&#39;</span><span class="p">)</span>
+                    <span class="n">envfile</span> <span class="o">=</span> <span class="n">default_envfile</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="o">.</span><span class="n">cwd</span><span class="p">())</span><span class="o">.</span><span class="n">as_posix</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">envfile</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">envfile</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">envfile</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="n">f</span><span class="s1">&#39;Cannot set &quot;envfile&quot; to non-existent file {envfile.as_posix()}.&#39;</span>
+                    <span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Using &quot;</span><span class="si">{envfile}</span><span class="s1">&quot; as the environment definition file.&#39;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">envfile</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;requirements.txt&#39;</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Using pip to install job dependencies.&#39;</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">envfile</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;environment.yaml&#39;</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Using conda to install job dependencies.&#39;</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="n">f</span><span class="s1">&#39;Environment instantiation is only currently supported with &#39;</span>
+                        <span class="n">f</span><span class="s1">&#39;&quot;requirements.txt&quot; and pip or &quot;environment.yaml&quot; and conda. &#39;</span>
+                        <span class="n">f</span><span class="s1">&#39;Environment definition file {envfile.as_posix()!r} is not supported.&#39;</span>
+                    <span class="p">)</span>
+
+                <span class="c1"># envfile must be in relative form for its Dockerfile definition</span>
+                <span class="n">envfile</span> <span class="o">=</span> <span class="n">envfile</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="o">.</span><span class="n">cwd</span><span class="p">())</span><span class="o">.</span><span class="n">as_posix</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;sagemaker&#39;</span><span class="p">:</span>
+                <span class="n">dockerfile</span><span class="p">,</span> <span class="n">runfile</span> <span class="o">=</span> <span class="n">create_sagemaker_resources</span><span class="p">(</span>
+                    <span class="n">train_image</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">,</span> <span class="n">envfile</span><span class="p">,</span> <span class="n">overwrite</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>  <span class="c1"># train_driver == &#39;kaggle&#39;:</span>
+                <span class="c1"># Kaggle kernels run in a default environment. The web UI allows you to </span>
+                <span class="c1"># specify custom packages but the API does not currently support this feature.</span>
+                <span class="k">if</span> <span class="n">envfile</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="s1">&#39;An environment definition file is provided, but the Kaggle training &#39;</span>
+                        <span class="s1">&#39;driver is currently in use. Kaggle does not currently support running &#39;</span>
+                        <span class="s1">&#39;code in custom containers in the API. The default environment will be &#39;</span>
+                        <span class="s1">&#39;used instead.&#39;</span>
+                    <span class="p">)</span>
+                <span class="n">dockerfile</span><span class="p">,</span> <span class="n">runfile</span> <span class="o">=</span> <span class="n">create_kaggle_resources</span><span class="p">(</span>
+                    <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span>
+                    <span class="n">title</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span>
+                        <span class="s1">&#39;title&#39;</span><span class="p">,</span> <span class="n">filename</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">,</span> <span class="s1">&#39; &#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="s1">&#39; &#39;</span><span class="p">)</span><span class="o">.</span><span class="n">title</span><span class="p">()</span>
+                    <span class="p">),</span>
+                    <span class="n">is_private</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;is_private&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+                    <span class="n">enable_gpu</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;enable_gpu&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+                    <span class="n">enable_internet</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;enable_internet&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+                    <span class="n">dataset_sources</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;dataset_sources&#39;</span><span class="p">,</span> <span class="p">[]),</span>
+                    <span class="n">kernel_sources</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;kernel_sources&#39;</span><span class="p">,</span> <span class="p">[]),</span>
+                    <span class="n">competition_sources</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;competition_sources&#39;</span><span class="p">,</span> <span class="p">[]),</span>
+                <span class="p">)</span>
+
+            <span class="c1"># The _latest_status internal prop tracks the most recent job status known by the</span>
+            <span class="c1"># class. If the job is initialized from a local file, but not launched, it will be</span>
+            <span class="c1"># set to &#39;unlaunched&#39;. If the job has been launched, but never checked, it will be</span>
+            <span class="c1"># &#39;submitted&#39;. If the job has been launched, been checked, and the check shows that</span>
+            <span class="c1"># the job is finished, it will be &#39;complete&#39; or &#39;failed&#39;, depending on the job&#39;s</span>
+            <span class="c1"># outcome.</span>
+            <span class="c1">#</span>
+            <span class="c1"># The status method is a public quasi-property (actually a method, as performing a</span>
+            <span class="c1"># network request on a property is disingenous) which abstracts over this property.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_latest_status</span> <span class="o">=</span> <span class="s1">&#39;unlaunched&#39;</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">dirpath</span> <span class="o">=</span> <span class="n">dirpath</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span> <span class="o">=</span> <span class="n">filepath</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">train_image</span> <span class="o">=</span> <span class="n">train_image</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">train_driver</span> <span class="o">=</span> <span class="n">train_driver</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">config</span> <span class="o">=</span> <span class="n">config</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tag</span> <span class="o">=</span> <span class="n">tag</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">dockerfile</span> <span class="o">=</span> <span class="n">dockerfile</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">runfile</span> <span class="o">=</span> <span class="n">runfile</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">docker_client</span> <span class="o">=</span> <span class="n">docker</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">from_env</span><span class="p">()</span>
 
+<div class="viewcode-block" id="TrainJob.status"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.TrainJob.status">[docs]</a>    <span class="k">def</span> <span class="nf">status</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns the status of this job instance. May be one of the following:</span>
+<span class="sd">        * `unlaunched` --- This job has not been launched (sent to compute using `fit`) yet.</span>
+<span class="sd">        * `submitted` --- This job has been submitted to cloud compute. It has not terminated yet.</span>
+<span class="sd">        * `complete` --- This job has finished running, and you may call `fetch` to get your model.</span>
+<span class="sd">        * `failed` --- This job has failed. Use the training driver&#39;s web tools to determine why.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_latest_status</span> <span class="o">==</span> <span class="s1">&#39;unlaunched&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s1">&#39;unlaunched&#39;</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_latest_status</span> <span class="o">==</span> <span class="s1">&#39;submitted&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;sagemaker&#39;</span><span class="p">:</span>
+                <span class="n">job_info</span> <span class="o">=</span> <span class="n">get_sagemaker_job_info</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">job_name</span><span class="p">)</span>
+                <span class="n">online_status</span> <span class="o">=</span> <span class="n">job_info</span><span class="p">[</span><span class="s1">&#39;TrainingJobStatus&#39;</span><span class="p">]</span>
+                <span class="c1"># TODO: is an &#39;interrupted&#39; status appropriate?</span>
+                <span class="k">if</span> <span class="n">online_status</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;InProgress&#39;</span><span class="p">,</span> <span class="s1">&#39;Stopping&#39;</span><span class="p">,</span> <span class="s1">&#39;Stopped&#39;</span><span class="p">]:</span>
+                    <span class="k">return</span> <span class="s1">&#39;submitted&#39;</span>
+                <span class="k">elif</span> <span class="n">online_status</span> <span class="o">==</span> <span class="s1">&#39;Completed&#39;</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_latest_status</span> <span class="o">=</span> <span class="s1">&#39;complete&#39;</span>
+                    <span class="k">return</span> <span class="s1">&#39;complete&#39;</span>
+                <span class="k">elif</span> <span class="n">online_status</span> <span class="o">==</span> <span class="s1">&#39;Failed&#39;</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="s1">&#39;failed&#39;</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="n">f</span><span class="s1">&#39;Checking the status of the SageMaker job returned unexpected status &#39;</span>
+                        <span class="n">f</span><span class="s1">&#39;value </span><span class="si">{online_status}</span><span class="s1">, indicating a possible schema change. Please &#39;</span>
+                        <span class="n">f</span><span class="s1">&#39;file an issue on GitHub with a traceback.&#39;</span>
+                    <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>  <span class="c1"># self.train_driver == &#39;kaggle&#39;</span>
+                <span class="n">online_status</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span>
+                    <span class="p">[</span><span class="s2">&quot;kaggle&quot;</span><span class="p">,</span> <span class="s2">&quot;kernels&quot;</span><span class="p">,</span> <span class="s2">&quot;status&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_name</span><span class="p">]</span>
+                <span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+                <span class="n">sentinel</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{self.job_name}</span><span class="s1"> has status &#39;</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">sentinel</span> <span class="ow">in</span> <span class="n">online_status</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="n">f</span><span class="s1">&#39;Checking the status of the Kaggle job returned unexpected status &#39;</span>
+                        <span class="n">f</span><span class="s1">&#39;value </span><span class="si">{online_status!r}</span><span class="s1">, indicating a possible schema change. Please &#39;</span>
+                        <span class="n">f</span><span class="s1">&#39;file an issue on GitHub with a traceback.&#39;</span>
+                    <span class="p">)</span>
+                <span class="n">l</span> <span class="o">=</span> <span class="n">online_status</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">sentinel</span><span class="p">)</span>
+                <span class="n">l</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">sentinel</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+                <span class="n">r</span> <span class="o">=</span> <span class="n">online_status</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;&quot;&#39;</span><span class="p">,</span> <span class="n">l</span><span class="p">)</span>
+                <span class="n">online_status</span> <span class="o">=</span> <span class="n">online_status</span><span class="p">[</span><span class="n">l</span><span class="p">:</span><span class="n">r</span><span class="p">]</span>
+
+                <span class="k">if</span> <span class="n">online_status</span> <span class="o">==</span> <span class="s1">&#39;complete&#39;</span><span class="p">:</span>
+                    <span class="c1"># Note that &#39;complete&#39; only means that the job runner did not throw an error,</span>
+                    <span class="c1"># e.g. every code cell ran or the script finished execution. The notebook or</span>
+                    <span class="c1"># script could have itself failed; this is still reported as a &#39;complete&#39; by</span>
+                    <span class="c1"># the Kaggle API.</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_latest_status</span> <span class="o">=</span> <span class="s1">&#39;complete&#39;</span>
+                    <span class="k">return</span> <span class="s1">&#39;complete&#39;</span>
+                <span class="k">elif</span> <span class="n">online_status</span> <span class="o">==</span> <span class="s1">&#39;running&#39;</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="s1">&#39;submitted&#39;</span>
+                <span class="k">elif</span> <span class="n">online_status</span> <span class="o">==</span> <span class="s1">&#39;failed&#39;</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="s1">&#39;failed&#39;</span>
+        <span class="k">else</span><span class="p">:</span>  <span class="c1"># self._latest_status in [&#39;complete&#39;, &#39;failed&#39;]</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_latest_status</span></div>
+
+<div class="viewcode-block" id="TrainJob.from_model_definition"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.TrainJob.from_model_definition">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_model_definition</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="n">filepath</span><span class="p">,</span> <span class="n">train_image</span><span class="o">=</span><span class="s1">&#39;default-cpu&#39;</span><span class="p">,</span> <span class="n">train_driver</span><span class="o">=</span><span class="s1">&#39;sagemaker&#39;</span><span class="p">,</span>
+        <span class="n">envfile</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">):</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">filepath</span><span class="o">=</span><span class="n">filepath</span><span class="p">,</span> <span class="n">train_image</span><span class="o">=</span><span class="n">train_image</span><span class="p">,</span> <span class="n">train_driver</span><span class="o">=</span><span class="n">train_driver</span><span class="p">,</span>
+            <span class="n">envfile</span><span class="o">=</span><span class="n">envfile</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">config</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="TrainJob.from_training_job"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.TrainJob.from_training_job">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_training_job</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">job_name</span><span class="p">,</span> <span class="n">train_driver</span><span class="o">=</span><span class="s1">&#39;sagemaker&#39;</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">job_name</span><span class="o">=</span><span class="n">job_name</span><span class="p">,</span> <span class="n">train_driver</span><span class="o">=</span><span class="n">train_driver</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">config</span>
+        <span class="p">)</span></div>
+
 <div class="viewcode-block" id="TrainJob.build"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.TrainJob.build">[docs]</a>    <span class="k">def</span> <span class="nf">build</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Builds the model training image locally.</span>
+<span class="sd">        Builds the model training image. This is the first step in the model training workflow.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">train_driver</span> <span class="o">!=</span> <span class="s1">&#39;kaggle&#39;</span><span class="p">:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">build_driver</span> <span class="o">==</span> <span class="s1">&#39;local&#39;</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">build_driver</span> <span class="o">==</span> <span class="s1">&#39;local-gpu&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">train_image</span> <span class="o">==</span> <span class="s1">&#39;default-cpu&#39;</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">train_image</span> <span class="o">==</span> <span class="s1">&#39;default-gpu&#39;</span><span class="p">:</span>
                 <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dirpath</span><span class="o">.</span><span class="n">as_posix</span><span class="p">()</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Building &quot;</span><span class="si">{self.tag}</span><span class="s1">&quot; container image from &quot;</span><span class="si">{path}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">docker_client</span><span class="o">.</span><span class="n">images</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">path</span><span class="p">,</span> <span class="n">tag</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="n">rm</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -366,10 +529,13 @@
 
 <div class="viewcode-block" id="TrainJob.push"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.TrainJob.push">[docs]</a>    <span class="k">def</span> <span class="nf">push</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Pushes the model training image to a remote repository. The repository used depends on the</span>
-<span class="sd">        `train_driver`:</span>
+<span class="sd">        Pushes the model training image to a remote image repository. This is the second step in</span>
+<span class="sd">        the model training workflow, as it is a necessary prerequesite to executing the model</span>
+<span class="sd">        training image. The repository used depends on the `train_driver`:</span>
 
 <span class="sd">        * &#39;sagemaker&#39; -- Pushes the image to Amazon ECR.</span>
+<span class="sd">        * &#39;kaggle&#39; -- Does nothing, only the default runtime environment is available, so no</span>
+<span class="sd">          registry is necessary.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;sagemaker&#39;</span><span class="p">:</span>
             <span class="kn">import</span> <span class="nn">boto3</span>
@@ -410,8 +576,6 @@
 
             <span class="bp">self</span><span class="o">.</span><span class="n">session</span> <span class="o">=</span> <span class="n">session</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">repository</span> <span class="o">=</span> <span class="n">repository</span>
-            <span class="c1"># TODO: does reusing the client actually save a network request?</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">sts_client</span> <span class="o">=</span> <span class="n">sts_client</span>
 
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;kaggle&#39;</span><span class="p">:</span>
             <span class="k">return</span>
@@ -421,7 +585,8 @@
 
 <div class="viewcode-block" id="TrainJob.train"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.TrainJob.train">[docs]</a>    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Launches a remote training job. Where the job is launched depends on the `train_driver`:</span>
+<span class="sd">        Launches a remote training job. The third and most critical step in the model</span>
+<span class="sd">        training workflow. Where the job is launched depends on the `train_driver`:</span>
 
 <span class="sd">        * sagemaker -- The job is run on an EC2 machine via the AWS SageMaker API.</span>
 <span class="sd">        * kaggle -- The job is run in a Kaggle Kernel via the Kaggle API.</span>
@@ -431,25 +596,20 @@
             <span class="kn">import</span> <span class="nn">sagemaker</span> <span class="k">as</span> <span class="nn">sage</span>
 
             <span class="n">iam_client</span> <span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s1">&#39;iam&#39;</span><span class="p">)</span>
+            <span class="n">sts_client</span> <span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s1">&#39;sts&#39;</span><span class="p">)</span>
 
-            <span class="n">default_role_name</span> <span class="o">=</span> <span class="s1">&#39;fahr_sagemaker_role&#39;</span>
-            <span class="n">role_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;role_name&#39;</span><span class="p">,</span> <span class="n">default_role_name</span><span class="p">)</span>
+            <span class="c1"># role_name is a required parameter at initialization time</span>
+            <span class="n">role_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;role_name&#39;</span><span class="p">]</span>
+
             <span class="c1"># TODO: try to catch the botocore.errorfactory.RepositoryNotFound error</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="n">role_info</span> <span class="o">=</span> <span class="n">iam_client</span><span class="o">.</span><span class="n">get_role</span><span class="p">(</span><span class="n">RoleName</span><span class="o">=</span><span class="n">role_name</span><span class="p">)</span>
             <span class="k">except</span><span class="p">:</span>
-                <span class="k">if</span> <span class="n">role_name</span> <span class="o">!=</span> <span class="n">default_role_name</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                        <span class="n">f</span><span class="s1">&#39;The </span><span class="si">{role_name}</span><span class="s1"> role does not exist, you must create it first.&#39;</span>
-                    <span class="p">)</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="c1"># TODO: step through the flow for creating the default if it doesn&#39;t exist</span>
-                    <span class="c1"># https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user.html</span>
-                    <span class="k">raise</span> <span class="ne">NotImplementedError</span>
-                    <span class="c1"># role = iam_client.create_role(RoleName=&#39;fahr-test&#39;)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="n">f</span><span class="s1">&#39;The </span><span class="si">{role_name}</span><span class="s1"> role does not exist, you must create it first.&#39;</span>
+                <span class="p">)</span>
 
             <span class="c1"># if the current execution context is not the `role_name` role, assume it</span>
-            <span class="n">sts_client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sts_client</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;sts_client&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="n">boto3</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s1">&#39;sts&#39;</span><span class="p">)</span>
             <span class="n">current_execution_context_arn</span> <span class="o">=</span> <span class="n">sts_client</span><span class="o">.</span><span class="n">get_caller_identity</span><span class="p">()[</span><span class="s1">&#39;Arn&#39;</span><span class="p">]</span>
 
             <span class="k">if</span> <span class="n">f</span><span class="s1">&#39;assumed-role/</span><span class="si">{role_name}</span><span class="s1">&#39;</span> <span class="ow">in</span> <span class="n">current_execution_context_arn</span><span class="p">:</span>
@@ -466,7 +626,7 @@
                     <span class="n">RoleSessionName</span><span class="o">=</span><span class="s1">&#39;fahr_session&#39;</span>
                 <span class="p">)[</span><span class="s1">&#39;Credentials&#39;</span><span class="p">]</span>
                 <span class="n">aws_access_key_id</span><span class="p">,</span> <span class="n">aws_secret_access_key</span><span class="p">,</span> <span class="n">aws_session_token</span> <span class="o">=</span> <span class="p">(</span>
-                    <span class="n">auth</span><span class="p">[</span><span class="s1">&#39;AccessKeyId&#39;</span><span class="p">],</span> <span class="n">auth</span><span class="p">[</span><span class="s1">&#39;AccessKeyId&#39;</span><span class="p">],</span> <span class="n">auth</span><span class="p">[</span><span class="s1">&#39;SessionToken&#39;</span><span class="p">]</span>
+                    <span class="n">auth</span><span class="p">[</span><span class="s1">&#39;AccessKeyId&#39;</span><span class="p">],</span> <span class="n">auth</span><span class="p">[</span><span class="s1">&#39;SecretAccessKey&#39;</span><span class="p">],</span> <span class="n">auth</span><span class="p">[</span><span class="s1">&#39;SessionToken&#39;</span><span class="p">]</span>
                 <span class="p">)</span>
 
             <span class="n">assumed_role_session</span> <span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">Session</span><span class="p">(</span>
@@ -474,18 +634,24 @@
                 <span class="n">aws_secret_access_key</span><span class="o">=</span><span class="n">aws_secret_access_key</span><span class="p">,</span> 
                 <span class="n">aws_session_token</span><span class="o">=</span><span class="n">aws_session_token</span>
             <span class="p">)</span>
+
+            <span class="c1"># If the repository identifier is not already known (from having run push beforehand)</span>
+            <span class="c1"># relearn it here. We take care to use the boto3 Session object for this, not the</span>
+            <span class="c1"># sagemaker Session object; the latter is slightly different.</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;repository&#39;</span><span class="p">):</span>
+                <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">repository</span> <span class="o">=</span> <span class="n">get_repository_info</span><span class="p">(</span>
+                    <span class="n">assumed_role_session</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="n">sts_client</span>
+                <span class="p">)</span>
+
             <span class="n">session</span> <span class="o">=</span> <span class="n">sage</span><span class="o">.</span><span class="n">Session</span><span class="p">(</span><span class="n">boto_session</span><span class="o">=</span><span class="n">assumed_role_session</span><span class="p">)</span>
             <span class="n">execution_role</span> <span class="o">=</span> <span class="n">sage</span><span class="o">.</span><span class="n">get_execution_role</span><span class="p">(</span><span class="n">sagemaker_session</span><span class="o">=</span><span class="n">session</span><span class="p">)</span>
-
-            <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;repository&#39;</span><span class="p">):</span>
-                <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">repository</span> <span class="o">=</span> <span class="n">get_repository_info</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="n">sts_client</span><span class="p">)</span>
 
             <span class="n">train_instance_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;train_instance_count&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
             <span class="n">train_instance_type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;train_instance_type&#39;</span><span class="p">,</span> <span class="s1">&#39;ml.c4.2xlarge&#39;</span><span class="p">)</span>
             <span class="n">output_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;output_path&#39;</span><span class="p">]</span>
             <span class="n">clf</span> <span class="o">=</span> <span class="n">sage</span><span class="o">.</span><span class="n">estimator</span><span class="o">.</span><span class="n">Estimator</span><span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">repository</span><span class="p">,</span> <span class="n">execution_role</span><span class="p">,</span> 
-                <span class="n">train_instance_count</span><span class="p">,</span> <span class="n">train_instance_type</span><span class="p">,</span>
+                <span class="n">image_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">repository</span><span class="p">,</span> <span class="n">role</span><span class="o">=</span><span class="n">execution_role</span><span class="p">,</span> 
+                <span class="n">train_instance_count</span><span class="o">=</span><span class="n">train_instance_count</span><span class="p">,</span> <span class="n">train_instance_type</span><span class="o">=</span><span class="n">train_instance_type</span><span class="p">,</span>
                 <span class="n">output_path</span><span class="o">=</span><span class="n">output_path</span><span class="p">,</span>
                 <span class="n">sagemaker_session</span><span class="o">=</span><span class="n">session</span>
             <span class="p">)</span>
@@ -513,6 +679,7 @@
                 <span class="n">f</span><span class="s1">&#39;To download finished model artifacts run </span><span class="si">{download_cmd}</span><span class="s1"> after &#39;</span>
                 <span class="n">f</span><span class="s1">&#39;training is complete.&#39;</span>
             <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_latest_status</span> <span class="o">=</span> <span class="s1">&#39;submitted&#39;</span>
 
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;kaggle&#39;</span><span class="p">:</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
@@ -531,13 +698,16 @@
                 <span class="n">f</span><span class="s1">&#39;To download finished model artifacts run </span><span class="si">{download_cmd}</span><span class="s1"> after &#39;</span>
                 <span class="n">f</span><span class="s1">&#39;training is complete.&#39;</span>
             <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">job_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tag</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_latest_status</span> <span class="o">=</span> <span class="s1">&#39;submitted&#39;</span>
 
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
 
 <div class="viewcode-block" id="TrainJob.fetch"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.TrainJob.fetch">[docs]</a>    <span class="k">def</span> <span class="nf">fetch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">local_path</span><span class="p">,</span> <span class="n">extract</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Extracts the model artifacts generated by the training job to `path`.</span>
+<span class="sd">        Extracts the model artifacts generated by the training job to `path`. This is the last step</span>
+<span class="sd">        in the model training workflow.</span>
 
 <span class="sd">        This method is a convenience wrapper over the `fetch` static method. Use this method to</span>
 <span class="sd">        fetch model artifacts generated by executing `train` on the current `TrainingJob` instance.</span>
@@ -552,20 +722,60 @@
 
 <span class="sd">        Raises</span>
 <span class="sd">        ------</span>
-<span class="sd">        ValueError -- Raised if you attempt to `fetch` without first running `fit`.</span>
+<span class="sd">        ValueError -- Raised if you attempt to `fetch` without first running `fit`, or if the job</span>
+<span class="sd">        is not finished running yet.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;job_name&#39;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;unlaunched&#39;</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Cannot fetch TrainJob model artifacts without fitting first.&#39;</span><span class="p">)</span>
+        
+        <span class="c1"># Validate path.</span>
+        <span class="n">local_path</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">local_path</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">local_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;&#39;local_path&#39; must point to an existing directory.&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">local_path</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;&#39;local_path&#39; must point to a directory.&quot;</span><span class="p">)</span>
 
-        <span class="k">return</span> <span class="n">fetch</span><span class="p">(</span>
-            <span class="n">local_path</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;output_path&#39;</span><span class="p">],</span> 
-            <span class="n">extract</span><span class="o">=</span><span class="n">extract</span><span class="p">,</span> <span class="n">job_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">job_name</span>
-        <span class="p">)</span></div>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;sagemaker&#39;</span><span class="p">:</span>
+            <span class="n">job_info</span> <span class="o">=</span> <span class="n">get_sagemaker_job_info</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">job_name</span><span class="p">)</span>
+            <span class="n">remote_path</span> <span class="o">=</span> <span class="n">job_info</span><span class="p">[</span><span class="s1">&#39;ModelArtifacts&#39;</span><span class="p">][</span><span class="s1">&#39;S3ModelArtifacts&#39;</span><span class="p">]</span>
+
+            <span class="n">remote_path_name_parts</span> <span class="o">=</span> <span class="n">remote_path</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;s3://&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)</span>
+            <span class="n">bucket_name</span> <span class="o">=</span> <span class="n">remote_path_name_parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="c1"># &#39;1:&#39; to exclude the bucket name part, and &#39;:-3&#39; to exclude the path fragment</span>
+            <span class="c1"># SageMaker adds: /{job_name}/output/model.tar.gz, to get just the part in between</span>
+            <span class="n">bucket_path</span> <span class="o">=</span> <span class="s1">&#39;/&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">remote_path_name_parts</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">3</span><span class="p">])</span>
+
+            <span class="n">model_path</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{bucket_path}</span><span class="s1">/</span><span class="si">{self.job_name}</span><span class="s1">/output/model.tar.gz&#39;</span><span class="o">.</span><span class="n">lstrip</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)</span>
+            <span class="n">local_model_filepath</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="si">{local_path}</span><span class="s1">/model.tar.gz&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span>
+            <span class="n">local_model_filepath_str</span> <span class="o">=</span> <span class="n">local_model_filepath</span><span class="o">.</span><span class="n">as_posix</span><span class="p">()</span>
+            <span class="n">local_model_directory_str</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;{local_model_filepath.parent.as_posix()}/&#39;</span>
+
+            <span class="kn">import</span> <span class="nn">boto3</span>
+            <span class="n">s3_client</span> <span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s1">&#39;s3&#39;</span><span class="p">)</span>
+            <span class="n">s3_client</span><span class="o">.</span><span class="n">download_file</span><span class="p">(</span><span class="n">bucket_name</span><span class="p">,</span> <span class="n">model_path</span><span class="p">,</span> <span class="n">local_model_filepath_str</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">extract</span><span class="p">:</span>
+                <span class="n">tarfile</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">local_model_filepath_str</span><span class="p">)</span><span class="o">.</span><span class="n">extractall</span><span class="p">()</span>
+                <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">local_model_filepath_str</span><span class="p">)</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Downloaded model artifact(s) to &quot;</span><span class="si">{local_model_directory_str}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Downloaded model artifact(s) to &quot;</span><span class="si">{local_model_filepath_str}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;kaggle&#39;</span><span class="p">:</span>
+            <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+                <span class="p">[</span><span class="s2">&quot;kaggle&quot;</span><span class="p">,</span> <span class="s2">&quot;kernels&quot;</span><span class="p">,</span> <span class="s2">&quot;output&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_name</span><span class="p">,</span> <span class="s2">&quot;-p&quot;</span><span class="p">,</span> <span class="n">local_path</span><span class="p">],</span>
+                <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">STDOUT</span>
+            <span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Downloaded model artifact(s) to &quot;</span><span class="si">{local_path}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="TrainJob.fit"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.TrainJob.fit">[docs]</a>    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Executes a model training job, generating a model training artifact in a local repository.</span>
 
+<span class="sd">        This is a convenience method that combines the first three steps of the model training</span>
+<span class="sd">        workflow: building the model training image, pushing it to a remote repository, and</span>
+<span class="sd">        executing it.</span>
+<span class="sd">        </span>
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
 <span class="sd">        path: str or pathlib.Path</span>
@@ -574,69 +784,6 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">push</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">train</span><span class="p">()</span></div></div>
-
-
-<div class="viewcode-block" id="fetch"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.fetch">[docs]</a><span class="k">def</span> <span class="nf">fetch</span><span class="p">(</span><span class="n">local_path</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span> <span class="n">remote_path</span><span class="p">,</span> <span class="n">train_driver</span><span class="o">=</span><span class="s1">&#39;sagemaker&#39;</span><span class="p">,</span> <span class="n">extract</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">job_name</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Extracts model artifacts generated by a prior `TrainingJob` to `local_path`.</span>
-
-<span class="sd">    Used by `TrainingJob.fetch` and by the CLI.</span>
-
-<span class="sd">    Parameters</span>
-<span class="sd">    ----------</span>
-<span class="sd">    local_path: str or pathlib.Path</span>
-<span class="sd">        Directory to write the model artifact to.</span>
-<span class="sd">    tag: str</span>
-<span class="sd">        The tag of the </span>
-<span class="sd">    remote_path: str</span>
-<span class="sd">        The root directory that the model artifact got written to.</span>
-<span class="sd">        This should be the same as the `config.output_path` of the `TrainingJob` that generated</span>
-<span class="sd">        this model artifact.</span>
-<span class="sd">    train_driver: str</span>
-<span class="sd">        The train_driver (service) that will perform the training. Cf. the `TrainJob` docstring.</span>
-<span class="sd">    extract: bool, default True</span>
-<span class="sd">        Whether or not to untar the data on arrival.</span>
-<span class="sd">    job_name: str or None</span>
-<span class="sd">        The name of the job used to generate the model artifact. If omitted, the most recent model</span>
-<span class="sd">        artifact associated with the given `tag` will be downloaded. If included, the model artifact</span>
-<span class="sd">        associated with this specific job will be downloaded.</span>
-
-<span class="sd">        This parameter is primarily intended for use by the `TrainJob.fetch` object method.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="c1"># TODO: remote_path or output_path? Standardize name.</span>
-    <span class="k">if</span> <span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;sagemaker&#39;</span><span class="p">:</span>
-        <span class="kn">import</span> <span class="nn">boto3</span>
-
-        <span class="n">path</span> <span class="o">=</span> <span class="n">validate_path</span><span class="p">(</span><span class="n">local_path</span><span class="p">)</span>
-        <span class="n">job_name</span> <span class="o">=</span> <span class="n">job_name</span> <span class="k">if</span> <span class="n">job_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">get_previous_job_name</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
-        <span class="n">output_dir</span> <span class="o">=</span> <span class="n">remote_path</span>
-        <span class="n">bucket_name</span> <span class="o">=</span> <span class="n">output_dir</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;s3://&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
-        <span class="n">bucket_path</span> <span class="o">=</span> <span class="s1">&#39;/&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;s3://&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">:])</span>
-        <span class="n">model_path</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{bucket_path}{job_name}</span><span class="s1">/output/model.tar.gz&#39;</span>
-        <span class="n">local_model_filepath</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;</span><span class="si">{path}</span><span class="s1">/model.tar.gz&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span>
-        <span class="n">local_model_filepath_str</span> <span class="o">=</span> <span class="n">local_model_filepath</span><span class="o">.</span><span class="n">as_posix</span><span class="p">()</span>
-        <span class="n">local_model_directory_str</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;{local_model_filepath.parent.as_posix()}/&#39;</span>
-
-        <span class="n">s3_client</span> <span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s1">&#39;s3&#39;</span><span class="p">)</span>
-        <span class="n">s3_client</span><span class="o">.</span><span class="n">download_file</span><span class="p">(</span><span class="n">bucket_name</span><span class="p">,</span> <span class="n">model_path</span><span class="p">,</span> <span class="n">local_model_filepath_str</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">extract</span><span class="p">:</span>
-            <span class="n">tarfile</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">local_model_filepath_str</span><span class="p">)</span><span class="o">.</span><span class="n">extractall</span><span class="p">()</span>
-            <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">local_model_filepath_str</span><span class="p">)</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Downloaded model artifact(s) to &quot;</span><span class="si">{local_model_directory_str}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Downloaded model artifact(s) to &quot;</span><span class="si">{local_model_filepath_str}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
-
-    <span class="k">elif</span> <span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;kaggle&#39;</span><span class="p">:</span>
-        <span class="n">path</span> <span class="o">=</span> <span class="n">validate_path</span><span class="p">(</span><span class="n">local_path</span><span class="p">)</span>
-        <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-            <span class="p">[</span><span class="s2">&quot;kaggle&quot;</span><span class="p">,</span> <span class="s2">&quot;kernels&quot;</span><span class="p">,</span> <span class="s2">&quot;output&quot;</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span> <span class="s2">&quot;-p&quot;</span><span class="p">,</span> <span class="n">local_path</span><span class="p">],</span>
-            <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">STDOUT</span>
-        <span class="p">)</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Downloaded model artifact(s) to &quot;</span><span class="si">{local_path}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
-
-    <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
 
 
 <div class="viewcode-block" id="copy_resources"><a class="viewcode-back" href="../../fahr.html#fahr.fahr.copy_resources">[docs]</a><span class="k">def</span> <span class="nf">copy_resources</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">dest</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">training_artifact</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
@@ -692,41 +839,49 @@
         <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">template_text</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">create_dockerfile</span><span class="p">(</span><span class="n">build_driver</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">,</span> <span class="n">envfile</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">create_dockerfile</span><span class="p">(</span><span class="n">train_image</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">,</span> <span class="n">envfile</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Creates a Dockerfile compatible with the given drivers and writes to to disk.</span>
 
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
-<span class="sd">    build_driver: str</span>
-<span class="sd">        The build_driver (service) that will build the model image.</span>
+<span class="sd">    train_image: str</span>
+<span class="sd">        The train_image that will build the model image.</span>
 <span class="sd">    train_driver: str</span>
 <span class="sd">        The train_driver (service) that will perform the training.</span>
 <span class="sd">    dirpath: str</span>
 <span class="sd">        Path to the directory being bundled.</span>
 <span class="sd">    filepath: str</span>
 <span class="sd">        Name of the model training artifact being bundled.</span>
-<span class="sd">    envfile: str</span>
-<span class="sd">        Path to the environment file that will be built in the image.</span>
+<span class="sd">    envfile: str or None</span>
+<span class="sd">        Path to the environment file that will be built in the image. If no environment</span>
+<span class="sd">        file is to be used, this variable will be set to None.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">train_driver</span> <span class="o">==</span> <span class="s1">&#39;sagemaker&#39;</span><span class="p">:</span>
-        <span class="n">create_template</span><span class="p">(</span>
-            <span class="s1">&#39;sagemaker/Dockerfile.template&#39;</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="s1">&#39;Dockerfile&#39;</span><span class="p">,</span> 
-            <span class="n">filepath</span><span class="o">=</span><span class="n">filepath</span><span class="p">,</span> <span class="n">envfile</span><span class="o">=</span><span class="n">envfile</span><span class="p">,</span> <span class="n">build_driver</span><span class="o">=</span><span class="n">build_driver</span>
-        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">envfile</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">envfile</span><span class="p">)</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;requirements.txt&#39;</span><span class="p">:</span>
+            <span class="n">create_template</span><span class="p">(</span>
+                <span class="s1">&#39;sagemaker/Dockerfile-pip.template&#39;</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="s1">&#39;Dockerfile&#39;</span><span class="p">,</span> 
+                <span class="n">filepath</span><span class="o">=</span><span class="n">filepath</span><span class="p">,</span> <span class="n">envfile</span><span class="o">=</span><span class="n">envfile</span><span class="p">,</span> <span class="n">train_image</span><span class="o">=</span><span class="n">train_image</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>  <span class="c1"># pathlib.Path(envfile).name == &#39;environment.yaml&#39;</span>
+            <span class="n">create_template</span><span class="p">(</span>
+                <span class="s1">&#39;sagemaker/Dockerfile-conda.template&#39;</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="s1">&#39;Dockerfile&#39;</span><span class="p">,</span> 
+                <span class="n">filepath</span><span class="o">=</span><span class="n">filepath</span><span class="p">,</span> <span class="n">envfile</span><span class="o">=</span><span class="n">envfile</span><span class="p">,</span> <span class="n">train_image</span><span class="o">=</span><span class="n">train_image</span>
+            <span class="p">)</span>
+            <span class="k">pass</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span>
 
 
-<span class="k">def</span> <span class="nf">create_runfile</span><span class="p">(</span><span class="n">build_driver</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">create_runfile</span><span class="p">(</span><span class="n">train_image</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Creates a run.sh entrypoint for the Docker image compatible with the given `train_driver`,</span>
 <span class="sd">    and writes it to disk.</span>
 
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
-<span class="sd">    build_driver: str</span>
-<span class="sd">        The build_driver (service) that will build the model image.</span>
+<span class="sd">    train_image: str</span>
+<span class="sd">        The train_image (service) that will build the model image.</span>
 <span class="sd">    train_driver: str</span>
 <span class="sd">        The train_driver (service) that will perform the training.</span>
 <span class="sd">    dirpath: str</span>
@@ -750,7 +905,7 @@
         <span class="k">raise</span> <span class="ne">NotImplementedError</span>
 
 
-<span class="k">def</span> <span class="nf">create_resources</span><span class="p">(</span><span class="n">build_driver</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">,</span> <span class="n">envfile</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">create_sagemaker_resources</span><span class="p">(</span><span class="n">train_image</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">,</span> <span class="n">envfile</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Creates file resources that will be used by this library in a target directory </span>
 <span class="sd">    (specifically, a Dockerfile and a run.sh entrypoint). Calls `create_runfile` and</span>
@@ -760,8 +915,8 @@
 
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
-<span class="sd">    build_driver: str</span>
-<span class="sd">        The build_driver (service) that will build the model image.</span>
+<span class="sd">    train_image: str</span>
+<span class="sd">        The train_image (service) that will build the model image.</span>
 <span class="sd">    train_driver: str</span>
 <span class="sd">        The train_driver (service) that will perform the training.</span>
 <span class="sd">    dirpath: str</span>
@@ -789,10 +944,10 @@
             <span class="n">f</span><span class="s1">&#39;A Dockerfile already exists at &quot;</span><span class="si">{dockerfile}</span><span class="s1">&quot; and &quot;overwrite&quot; is set to True. &#39;</span>
             <span class="n">f</span><span class="s1">&#39;Overwriting the file that is currently there.&#39;</span>
         <span class="p">)</span>
-        <span class="n">create_dockerfile</span><span class="p">(</span><span class="n">build_driver</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">envfile</span><span class="p">)</span>
-    <span class="k">else</span><span class="p">:</span>  <span class="c1"># dockerfile_exists</span>
+        <span class="n">create_dockerfile</span><span class="p">(</span><span class="n">train_image</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">envfile</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>  <span class="c1"># not dockerfile_exists</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Creating new Dockerfile at &quot;</span><span class="si">{dockerfile}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
-        <span class="n">create_dockerfile</span><span class="p">(</span><span class="n">build_driver</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">envfile</span><span class="p">)</span>
+        <span class="n">create_dockerfile</span><span class="p">(</span><span class="n">train_image</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">envfile</span><span class="p">)</span>
 
     <span class="n">runfile</span> <span class="o">=</span> <span class="n">dirpath</span> <span class="o">/</span> <span class="s1">&#39;run.sh&#39;</span>
     <span class="n">runfile_exists</span> <span class="o">=</span> <span class="n">runfile</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
@@ -806,10 +961,10 @@
             <span class="n">f</span><span class="s1">&#39;An image entrypoint already exists at &quot;</span><span class="si">{runfile}</span><span class="s1">&quot; and &quot;overwrite&quot; is set to True. &#39;</span>
             <span class="n">f</span><span class="s1">&#39;Overwriting the file that is currently there.&#39;</span>
         <span class="p">)</span>
-        <span class="n">create_runfile</span><span class="p">(</span><span class="n">build_driver</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">)</span>
+        <span class="n">create_runfile</span><span class="p">(</span><span class="n">train_image</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>  <span class="c1"># runfile_exists</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Creating new image entrypoint at &quot;</span><span class="si">{runfile}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
-        <span class="n">create_runfile</span><span class="p">(</span><span class="n">build_driver</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">)</span>  
+        <span class="n">create_runfile</span><span class="p">(</span><span class="n">train_image</span><span class="p">,</span> <span class="n">train_driver</span><span class="p">,</span> <span class="n">dirpath</span><span class="p">,</span> <span class="n">filepath</span><span class="p">)</span>  
 
     <span class="k">return</span> <span class="n">dockerfile</span><span class="p">,</span> <span class="n">runfile</span>
 
@@ -854,13 +1009,16 @@
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s1">&#39;Writing kernel metadata to &quot;</span><span class="si">{kernel_metadata_filepath}</span><span class="s1">&quot;.&#39;</span><span class="p">)</span>
     <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">kernel_metadata_filepath</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
         <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">kernel_metadata</span><span class="p">,</span> <span class="n">fp</span><span class="p">)</span>
+    
+    <span class="c1"># The other create_*_resources methods return a (Dockerfile, runfile) tuple. Since Kaggle</span>
+    <span class="c1"># does not make use of these assets, we return a (None, None) instead here.</span>
+    <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
 
 
-<span class="k">def</span> <span class="nf">get_repository_info</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span> <span class="n">sts_client</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">get_repository_info</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span> <span class="n">sts_client</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Identify the ECR repository for a given tag. SageMaker only.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">sts_client</span> <span class="o">=</span> <span class="n">sts_client</span> <span class="k">if</span> <span class="n">sts_client</span> <span class="k">else</span> <span class="n">session</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s1">&#39;sts&#39;</span><span class="p">)</span>
     <span class="n">account_id</span> <span class="o">=</span> <span class="n">sts_client</span><span class="o">.</span><span class="n">get_caller_identity</span><span class="p">()[</span><span class="s1">&#39;Account&#39;</span><span class="p">]</span>
     <span class="n">region</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">region_name</span>
 
@@ -868,18 +1026,24 @@
     <span class="k">return</span> <span class="n">region</span><span class="p">,</span> <span class="n">account_id</span><span class="p">,</span> <span class="n">repository</span>
 
 
-<span class="k">def</span> <span class="nf">get_previous_job_name</span><span class="p">(</span><span class="n">tag</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">get_previous_jobs</span><span class="p">(</span><span class="n">tag</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Given the training run tag, determine the name of the job immediately previous to this</span>
 <span class="sd">    one, assuming one exists. SageMaker only.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="kn">import</span> <span class="nn">boto3</span>
     
-    <span class="c1"># FIXME: support paginated requests, as otherwise most recent run can fall of the list</span>
+    <span class="c1"># TODO: support paginated requests, as otherwise most recent run can fall of the list</span>
     <span class="n">sagemaker_client</span> <span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s1">&#39;sagemaker&#39;</span><span class="p">)</span>
     <span class="n">finished_jobs</span> <span class="o">=</span> <span class="n">sagemaker_client</span><span class="o">.</span><span class="n">list_training_jobs</span><span class="p">()[</span><span class="s1">&#39;TrainingJobSummaries&#39;</span><span class="p">]</span>
     <span class="n">prefix</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;fahr-{tag.replace(&quot;/&quot;, &quot;-&quot;).replace(&quot;_&quot;, &quot;-&quot;)}&#39;</span>
     <span class="n">previous_jobs</span> <span class="o">=</span> <span class="p">[</span><span class="n">j</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">finished_jobs</span> <span class="k">if</span> <span class="n">j</span><span class="p">[</span><span class="s1">&#39;TrainingJobName&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">prefix</span><span class="p">)]</span>
+    <span class="k">return</span> <span class="n">previous_jobs</span>
+
+
+<span class="k">def</span> <span class="nf">get_previous_job_name</span><span class="p">(</span><span class="n">tag</span><span class="p">):</span>
+    <span class="n">previous_jobs</span> <span class="o">=</span> <span class="n">get_previous_jobs</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
+    <span class="n">prefix</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;fahr-{tag.replace(&quot;/&quot;, &quot;-&quot;).replace(&quot;_&quot;, &quot;-&quot;)}&#39;</span>
     <span class="k">return</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{prefix}</span><span class="s1">-{len(previous_jobs)}&#39;</span> <span class="k">if</span> <span class="n">previous_jobs</span> <span class="k">else</span> <span class="kc">None</span>
 
 
@@ -898,19 +1062,13 @@
         <span class="k">return</span> <span class="n">f</span><span class="s1">&#39;fahr-</span><span class="si">{tag}</span><span class="s1">-1&#39;</span>
 
 
-<span class="k">def</span> <span class="nf">validate_path</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Checks that a path exists and is a directory.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">path</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Output parameter must point to an existing directory.&quot;</span><span class="p">)</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Output path must be a directory.&quot;</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">path</span>
+<span class="k">def</span> <span class="nf">get_sagemaker_job_info</span><span class="p">(</span><span class="n">job_name</span><span class="p">):</span>
+    <span class="kn">import</span> <span class="nn">boto3</span>
+    <span class="n">sagemaker</span> <span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s1">&#39;sagemaker&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">sagemaker</span><span class="o">.</span><span class="n">describe_training_job</span><span class="p">(</span><span class="n">TrainingJobName</span><span class="o">=</span><span class="n">job_name</span><span class="p">)</span>
 
 
-<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;TrainJob&#39;</span><span class="p">,</span> <span class="s1">&#39;fetch&#39;</span><span class="p">,</span> <span class="s1">&#39;copy_resources&#39;</span><span class="p">]</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;TrainJob&#39;</span><span class="p">,</span> <span class="s1">&#39;copy_resources&#39;</span><span class="p">]</span>
 </pre></div>
 
            </div>
